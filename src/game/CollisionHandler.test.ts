@@ -89,5 +89,60 @@ describe('CollisionHandler', () => {
       expect(p1.accelVec.x).toBeLessThan(0);
       expect(p2.accelVec.x).toBeGreaterThan(0);
     });
+
+    it('pushes overlapping entities apart so they no longer overlap', () => {
+      const p1 = new Entity();
+      p1.position = { x: 0, y: 0, z: 0 };
+      p1.accelVec = { x: 0.5, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const p2 = new Entity();
+      p2.position = { x: 10, y: 0, z: 0 };
+      p2.accelVec = { x: -0.5, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      // They overlap: dist=10, combined radii=28, overlap=18
+      const evt = new CollisionEvent(p1, p2, 0.5);
+      handler.onGameEvent(evt);
+
+      // After separation, distance should be >= combined radii
+      const dx = p2.position.x - p1.position.x;
+      const dy = p2.position.y - p1.position.y;
+      const newDist = Math.sqrt(dx * dx + dy * dy);
+      expect(newDist).toBeGreaterThanOrEqual(28);
+
+      // P1 should have moved left (negative X), P2 right (positive X)
+      expect(p1.position.x).toBeLessThan(0);
+      expect(p2.position.x).toBeGreaterThan(10);
+    });
+
+    it('separates entities at exact same position using previousPosition fallback', () => {
+      const p1 = new Entity();
+      p1.previousPosition = { x: -5, y: 0, z: 0 };
+      p1.position = { x: 0, y: 0, z: 0 }; // exactly overlapping
+      p1.accelVec = { x: 0.5, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const p2 = new Entity();
+      p2.previousPosition = { x: 5, y: 0, z: 0 };
+      p2.position = { x: 0, y: 0, z: 0 }; // exactly overlapping
+      p2.accelVec = { x: -0.5, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new CollisionEvent(p1, p2, 0);
+      handler.onGameEvent(evt);
+
+      // Should have separated along X axis (based on previousPosition direction)
+      const newDist = Math.abs(p2.position.x - p1.position.x);
+      expect(newDist).toBeGreaterThanOrEqual(28);
+
+      // P1 pushed left, P2 pushed right (based on prev positions: P2 was to the right)
+      expect(p1.position.x).toBeLessThan(0);
+      expect(p2.position.x).toBeGreaterThan(0);
+
+      // Velocities should be reversed: P1 moving left, P2 moving right
+      expect(p1.accelVec.x).toBeLessThan(0);
+      expect(p2.accelVec.x).toBeGreaterThan(0);
+    });
   });
 });

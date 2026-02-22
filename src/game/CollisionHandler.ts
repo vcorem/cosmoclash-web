@@ -44,10 +44,43 @@ export class CollisionHandler implements GameEventListener {
     const dx = b.position.x - a.position.x;
     const dy = b.position.y - a.position.y;
     const dz = b.position.z - a.position.z;
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-    const nx = dx / dist;
-    const ny = dy / dist;
-    const nz = dz / dist;
+    const actualDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    // Compute separation normal. When entities overlap exactly (head-on collision),
+    // current positions give a zero-length vector. Fall back to previousPosition
+    // to recover approach direction.
+    let nx: number, ny: number, nz: number;
+    if (actualDist < 0.001) {
+      const pdx = b.previousPosition.x - a.previousPosition.x;
+      const pdy = b.previousPosition.y - a.previousPosition.y;
+      const pdz = b.previousPosition.z - a.previousPosition.z;
+      const prevDist = Math.sqrt(pdx * pdx + pdy * pdy + pdz * pdz);
+      if (prevDist < 0.001) {
+        // Last resort: arbitrary separation along X
+        nx = 1; ny = 0; nz = 0;
+      } else {
+        nx = pdx / prevDist;
+        ny = pdy / prevDist;
+        nz = pdz / prevDist;
+      }
+    } else {
+      nx = dx / actualDist;
+      ny = dy / actualDist;
+      nz = dz / actualDist;
+    }
+
+    // Push entities apart so collision spheres no longer overlap.
+    // Uses first collision sphere radius for each entity (matches original C++).
+    const radiusA = a.collisionSpheres[0]?.radius ?? 0;
+    const radiusB = b.collisionSpheres[0]?.radius ?? 0;
+    const overlap = radiusA + radiusB - actualDist;
+    if (overlap > 0) {
+      const half = overlap / 2 + 1; // +1 buffer to prevent re-overlap next frame
+      a.position.x -= nx * half;
+      a.position.y -= ny * half;
+      b.position.x += nx * half;
+      b.position.y += ny * half;
+    }
 
     const aSpeed = Math.sqrt(
       a.accelVec.x * a.accelVec.x +
