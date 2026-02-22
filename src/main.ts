@@ -111,8 +111,8 @@ const gameLoop = new GameLoop(
       playerMesh.quaternion.copy(rollQ.multiply(headingQ));
     }
 
-    // Move stars with camera
-    stars.position.set(camera.position.x, camera.position.y, ARENA.STARS_Z);
+    // Parallax: stars scroll at 80% of camera speed for depth effect
+    stars.position.set(camera.position.x * 0.8, camera.position.y * 0.8, ARENA.STARS_Z);
   },
   () => {
     renderer.render(scene, camera);
