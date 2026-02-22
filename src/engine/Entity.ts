@@ -16,6 +16,7 @@ export enum EntityType {
   Bullet,
   Sun,
   Dummy,
+  Snot,
 }
 
 export class Entity {
