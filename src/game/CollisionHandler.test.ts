@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CollisionHandler } from './CollisionHandler';
+import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
 import { BulletHitEvent, CollisionEvent } from '@/engine/GameEvent';
@@ -74,75 +74,269 @@ describe('CollisionHandler', () => {
       expect(p2.health).toBeLessThan(1);
     });
 
-    it('reflects velocity vectors apart (separation force)', () => {
+    it('deflects velocity away from other entity along collision normal', () => {
       const p1 = new Entity();
       p1.position = { x: 0, y: 0, z: 0 };
-      p1.accelVec = { x: 0.5, y: 0, z: 0 };
+      p1.accelVec = { x: 0.5, y: 0, z: 0 }; // moving right toward p2
 
       const p2 = new Entity();
       p2.position = { x: 10, y: 0, z: 0 };
-      p2.accelVec = { x: -0.5, y: 0, z: 0 };
+      p2.accelVec = { x: -0.5, y: 0, z: 0 }; // moving left toward p1
 
       const evt = new CollisionEvent(p1, p2, 0.5);
       handler.onGameEvent(evt);
 
+      // P1's velocity should now point away from P2 (leftward)
       expect(p1.accelVec.x).toBeLessThan(0);
+      // P2's velocity should now point away from P1 (rightward)
       expect(p2.accelVec.x).toBeGreaterThan(0);
     });
 
-    it('pushes overlapping entities apart so they no longer overlap', () => {
+    it('preserves speed magnitude after deflection', () => {
       const p1 = new Entity();
       p1.position = { x: 0, y: 0, z: 0 };
-      p1.accelVec = { x: 0.5, y: 0, z: 0 };
-      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+      p1.accelVec = { x: 3, y: 4, z: 0 }; // speed = 5
 
       const p2 = new Entity();
       p2.position = { x: 10, y: 0, z: 0 };
-      p2.accelVec = { x: -0.5, y: 0, z: 0 };
-      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+      p2.accelVec = { x: -2, y: 0, z: 0 }; // speed = 2
 
-      // They overlap: dist=10, combined radii=28, overlap=18
-      const evt = new CollisionEvent(p1, p2, 0.5);
+      const evt = new CollisionEvent(p1, p2, 0);
       handler.onGameEvent(evt);
 
-      // After separation, distance should be >= combined radii
-      const dx = p2.position.x - p1.position.x;
-      const dy = p2.position.y - p1.position.y;
-      const newDist = Math.sqrt(dx * dx + dy * dy);
-      expect(newDist).toBeGreaterThanOrEqual(28);
+      const p1Speed = Math.sqrt(
+        p1.accelVec.x ** 2 + p1.accelVec.y ** 2 + p1.accelVec.z ** 2,
+      );
+      const p2Speed = Math.sqrt(
+        p2.accelVec.x ** 2 + p2.accelVec.y ** 2 + p2.accelVec.z ** 2,
+      );
 
-      // P1 should have moved left (negative X), P2 right (positive X)
-      expect(p1.position.x).toBeLessThan(0);
-      expect(p2.position.x).toBeGreaterThan(10);
+      expect(p1Speed).toBeCloseTo(5);
+      expect(p2Speed).toBeCloseTo(2);
     });
 
-    it('separates entities at exact same position using previousPosition fallback', () => {
+    it('separates overlapping entities along collision normal', () => {
       const p1 = new Entity();
-      p1.previousPosition = { x: -5, y: 0, z: 0 };
-      p1.position = { x: 0, y: 0, z: 0 }; // exactly overlapping
+      p1.position = { x: -3, y: 0, z: 0 };
       p1.accelVec = { x: 0.5, y: 0, z: 0 };
       p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
 
       const p2 = new Entity();
-      p2.previousPosition = { x: 5, y: 0, z: 0 };
-      p2.position = { x: 0, y: 0, z: 0 }; // exactly overlapping
+      p2.position = { x: 3, y: 0, z: 0 };
       p2.accelVec = { x: -0.5, y: 0, z: 0 };
       p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
 
       const evt = new CollisionEvent(p1, p2, 0);
       handler.onGameEvent(evt);
 
-      // Should have separated along X axis (based on previousPosition direction)
+      // P1 pushed left, P2 pushed right
+      expect(p1.position.x).toBeLessThan(-3);
+      expect(p2.position.x).toBeGreaterThan(3);
+
+      // After separation they should be at least radiusA + radiusB apart
       const newDist = Math.abs(p2.position.x - p1.position.x);
-      expect(newDist).toBeGreaterThanOrEqual(28);
+      expect(newDist).toBeGreaterThanOrEqual(36);
+    });
 
-      // P1 pushed left, P2 pushed right (based on prev positions: P2 was to the right)
-      expect(p1.position.x).toBeLessThan(0);
-      expect(p2.position.x).toBeGreaterThan(0);
+    it('separates same-direction travel (both going right)', () => {
+      const p1 = new Entity();
+      p1.previousPosition = { x: -5, y: 0, z: 0 };
+      p1.position = { x: 0, y: 0, z: 0 };
+      p1.accelVec = { x: 1, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
 
-      // Velocities should be reversed: P1 moving left, P2 moving right
+      const p2 = new Entity();
+      p2.previousPosition = { x: 0, y: 0, z: 0 };
+      p2.position = { x: 5, y: 0, z: 0 };
+      p2.accelVec = { x: 1, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new CollisionEvent(p1, p2, 0);
+      handler.onGameEvent(evt);
+
+      // Must actually separate (collision normal is along X)
+      const newDist = Math.abs(p2.position.x - p1.position.x);
+      expect(newDist).toBeGreaterThanOrEqual(36);
+    });
+
+    it('handles exact same position (uses relative travel fallback)', () => {
+      const p1 = new Entity();
+      p1.previousPosition = { x: -5, y: 0, z: 0 };
+      p1.position = { x: 0, y: 0, z: 0 };
+      p1.accelVec = { x: 0.5, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const p2 = new Entity();
+      p2.previousPosition = { x: 5, y: 0, z: 0 };
+      p2.position = { x: 0, y: 0, z: 0 };
+      p2.accelVec = { x: -0.5, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new CollisionEvent(p1, p2, 0);
+      handler.onGameEvent(evt);
+
+      // Pushed apart
+      const newDist = Math.sqrt(
+        (p2.position.x - p1.position.x) ** 2 +
+        (p2.position.y - p1.position.y) ** 2,
+      );
+      expect(newDist).toBeGreaterThanOrEqual(36);
+    });
+
+    it('snaps previousPosition after separation', () => {
+      const p1 = new Entity();
+      p1.position = { x: -2, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const p2 = new Entity();
+      p2.position = { x: 2, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new CollisionEvent(p1, p2, 0);
+      handler.onGameEvent(evt);
+
+      expect(p1.previousPosition).toEqual(p1.position);
+      expect(p2.previousPosition).toEqual(p2.position);
+    });
+
+    it('is idempotent — repeated calls keep velocity pointing away', () => {
+      const p1 = new Entity();
+      p1.position = { x: 0, y: 0, z: 0 };
+      p1.accelVec = { x: 5, y: 0, z: 0 };
+      p1.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const p2 = new Entity();
+      p2.position = { x: 3, y: 0, z: 0 };
+      p2.accelVec = { x: -5, y: 0, z: 0 };
+      p2.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      // First collision
+      handler.onGameEvent(new CollisionEvent(p1, p2, 0));
+      const p1VelAfterFirst = { ...p1.accelVec };
+
+      // Simulate player thrusting back: add rightward velocity to p1
+      p1.accelVec.x += 3;
+      // Move p1 back into p2's zone
+      p1.position = { x: p2.position.x - 3, y: 0, z: 0 };
+
+      // Second collision
+      handler.onGameEvent(new CollisionEvent(p1, p2, 0));
+
+      // P1's velocity should still point away from P2 (leftward)
       expect(p1.accelVec.x).toBeLessThan(0);
-      expect(p2.accelVec.x).toBeGreaterThan(0);
+      // No oscillation — direction consistent
+    });
+  });
+
+  describe('enforceMinimumDistance (contact constraint)', () => {
+    it('pushes overlapping entities apart', () => {
+      const a = new Entity();
+      a.position = { x: -5, y: 0, z: 0 };
+      a.accelVec = { x: 0, y: 0, z: 0 };
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 5, y: 0, z: 0 };
+      b.accelVec = { x: 0, y: 0, z: 0 };
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      const dist = Math.abs(b.position.x - a.position.x);
+      expect(dist).toBeGreaterThanOrEqual(36);
+    });
+
+    it('cancels velocity component toward other entity', () => {
+      const a = new Entity();
+      a.position = { x: -5, y: 0, z: 0 };
+      a.accelVec = { x: 1, y: 0.5, z: 0 }; // moving right (toward b) + up
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 5, y: 0, z: 0 };
+      b.accelVec = { x: 0, y: 0, z: 0 };
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      // Toward-component (x) should be cancelled, perpendicular (y) preserved
+      expect(a.accelVec.x).toBeCloseTo(0);
+      expect(a.accelVec.y).toBeCloseTo(0.5);
+    });
+
+    it('does not add velocity to stationary entities', () => {
+      const a = new Entity();
+      a.position = { x: -5, y: 0, z: 0 };
+      a.accelVec = { x: 0, y: 0, z: 0 };
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 5, y: 0, z: 0 };
+      b.accelVec = { x: 0, y: 0, z: 0 };
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      // No velocity added — just position push
+      expect(a.accelVec.x).toBe(0);
+      expect(a.accelVec.y).toBe(0);
+      expect(b.accelVec.x).toBe(0);
+      expect(b.accelVec.y).toBe(0);
+    });
+
+    it('preserves velocity moving away from other entity', () => {
+      const a = new Entity();
+      a.position = { x: -5, y: 0, z: 0 };
+      a.accelVec = { x: -1, y: 0, z: 0 }; // already moving away from b
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 5, y: 0, z: 0 };
+      b.accelVec = { x: 1, y: 0, z: 0 }; // already moving away from a
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      // Velocities already pointing away — should be unchanged
+      expect(a.accelVec.x).toBeCloseTo(-1);
+      expect(b.accelVec.x).toBeCloseTo(1);
+    });
+
+    it('cancels toward-velocity in buffer zone (not overlapping)', () => {
+      const a = new Entity();
+      a.position = { x: -15, y: 0, z: 0 }; // dist=30, in buffer (28-36) but not overlapping
+      a.accelVec = { x: 0.8, y: 0.3, z: 0 }; // moving toward b
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 15, y: 0, z: 0 };
+      b.accelVec = { x: 0, y: 0, z: 0 };
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      // Toward-component (x) cancelled, perpendicular (y) preserved
+      // Positions should NOT be pushed (dist > minDist)
+      expect(a.position.x).toBe(-15);
+      expect(a.accelVec.x).toBeCloseTo(0);
+      expect(a.accelVec.y).toBeCloseTo(0.3);
+    });
+
+    it('does nothing when entities are far apart', () => {
+      const a = new Entity();
+      a.position = { x: -100, y: 0, z: 0 };
+      a.accelVec = { x: 1, y: 0, z: 0 };
+      a.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const b = new Entity();
+      b.position = { x: 100, y: 0, z: 0 };
+      b.accelVec = { x: -1, y: 0, z: 0 };
+      b.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      enforceMinimumDistance(a, b);
+
+      expect(a.accelVec.x).toBe(1);
+      expect(b.accelVec.x).toBe(-1);
     });
   });
 });

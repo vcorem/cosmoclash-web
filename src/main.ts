@@ -8,7 +8,7 @@ import { Bullet } from '@/game/Bullet';
 import { InputManager, PlayerInput } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
 import { CollisionDetector } from '@/engine/CollisionDetector';
-import { CollisionHandler } from '@/game/CollisionHandler';
+import { CollisionHandler, enforceMinimumDistance } from '@/game/CollisionHandler';
 import { GameEventMgr } from '@/engine/GameEventMgr';
 import { GameEventType } from '@/engine/GameEvent';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
@@ -31,9 +31,11 @@ window.addEventListener('resize', () => {
 // Create players
 const player1 = new Player(GONDI_STATS);
 player1.position = { ...ARENA.PLAYER1_SPAWN };
+player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
 
 const player2 = new Player(GONDI_STATS);
 player2.position = { ...ARENA.PLAYER2_SPAWN };
+player2.previousPosition = { ...ARENA.PLAYER2_SPAWN };
 
 // Reusable objects for per-frame rotation (avoids GC pressure)
 const _qHead = new THREE.Quaternion();
@@ -175,6 +177,12 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
+    // Collision detection FIRST (matches original C++ loop order).
+    // Running before input/movement means deflected velocities are already
+    // set when thrust is applied, preventing ships from re-entering overlap.
+    collisionDetector.checkCollisions(entityManager.entities);
+    enforceMinimumDistance(player1, player2);
+
     // Process input for both players
     updatePlayerInput(player1, input.player(0), thrustEffect1, dt);
     updatePlayerInput(player2, input.player(1), thrustEffect2, dt);
@@ -182,9 +190,6 @@ const gameLoop = new GameLoop(
     // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     entityManager.update(dt, camCenter);
-
-    // Collision detection
-    collisionDetector.checkCollisions(entityManager.entities);
 
     // Update camera to track both players
     cameraController.update(

@@ -18,6 +18,9 @@ export enum EntityType {
 }
 
 export class Entity {
+  private static _nextId = 0;
+  readonly id: number = Entity._nextId++;
+
   position: Vec3 = { x: 0, y: 0, z: 0 };
   previousPosition: Vec3 = { x: 0, y: 0, z: 0 };
   accelVec: Vec3 = { x: 0, y: 0, z: 0 };
