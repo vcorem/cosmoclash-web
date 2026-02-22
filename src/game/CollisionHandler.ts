@@ -28,12 +28,15 @@ export class CollisionHandler implements GameEventListener {
     const bullet = event.bullet as Bullet;
     const target = event.target;
 
-    target.health -= bullet.config.damage;
-    bullet.destroy();
-
-    if (target.health <= 0) {
-      target.destroy();
+    // Sun is indestructible — bullets die on contact but deal no damage
+    if (target.entityType !== EntityType.Sun) {
+      target.health -= bullet.config.damage;
+      if (target.health <= 0) {
+        target.destroy();
+      }
     }
+
+    bullet.destroy();
   }
 
   private handleShipCollision(event: CollisionEvent): void {

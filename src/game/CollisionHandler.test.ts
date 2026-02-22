@@ -55,6 +55,21 @@ describe('CollisionHandler', () => {
 
       expect(target.alive).toBe(true);
     });
+
+    it('destroys bullet on sun hit but does not damage sun', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.health = 1;
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const bullet = new Bullet(FLAME_BULLET_CONFIG, new Entity());
+      const evt = new BulletHitEvent(bullet, sun);
+
+      handler.onGameEvent(evt);
+
+      expect(bullet.alive).toBe(false);
+      expect(sun.health).toBe(1); // sun takes no damage
+    });
   });
 
   describe('ship-ship collision', () => {
