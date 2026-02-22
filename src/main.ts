@@ -27,26 +27,34 @@ const player = new Player(GONDI_STATS);
 player.position = { ...ARENA.PLAYER1_SPAWN };
 
 // Load Gondi model (with fallback to placeholder)
+// The outer group receives per-frame gameplay rotation (0, rollAngle, angle).
+// The inner model gets the one-time base orientation (-90, 0, 90) matching gondi.cpp:53.
 const loader = new GLTFLoader();
 let playerMesh: THREE.Object3D | null = null;
+const rad = Math.PI / 180;
 
 loader.load(
   '/models/gondi.glb',
   (gltf) => {
+    const container = new THREE.Group();
     const model = gltf.scene;
     model.scale.set(1.8, 1.8, 1.8);
-    scene.add(model);
-    playerMesh = model;
+    model.rotation.set(-90 * rad, 0, 0);
+    container.add(model);
+    scene.add(container);
+    playerMesh = container;
   },
   undefined,
   () => {
-    // Fallback: cone placeholder
     console.warn('Could not load gondi.glb, using placeholder');
+    const container = new THREE.Group();
     const geo = new THREE.ConeGeometry(8, 20, 8);
     const mat = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
     const mesh = new THREE.Mesh(geo, mat);
-    scene.add(mesh);
-    playerMesh = mesh;
+    mesh.rotation.set(-90 * rad, 0, 0);
+    container.add(mesh);
+    scene.add(container);
+    playerMesh = container;
   }
 );
 
@@ -89,13 +97,9 @@ const gameLoop = new GameLoop(
     // Sync mesh to player state
     if (playerMesh) {
       playerMesh.position.set(player.position.x, player.position.y, player.position.z);
-      // Rotation: (0, rollAngle, angle) in original — Three.js uses radians
-      const rad = Math.PI / 180;
-      playerMesh.rotation.set(
-        -90 * rad, // Base rotation from original model orientation
-        player.rollAngle * rad,
-        player.angle * rad
-      );
+      // Per-frame gameplay rotation: (0, rollAngle, angle) matching original player.cpp:173
+      // Base model orientation is baked into the inner child at load time
+      playerMesh.rotation.set(0, player.rollAngle * rad, player.angle * rad);
     }
 
     // Move stars with camera
