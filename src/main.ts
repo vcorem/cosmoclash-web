@@ -6,6 +6,7 @@ import { Player, GONDI_STATS } from '@/game/Player';
 import { ARENA } from '@/game/Arena';
 import { Bullet } from '@/game/Bullet';
 import { InputManager } from '@/input/InputManager';
+import { ThrustEffect } from '@/game/ThrustEffect';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, updateCamera } from '@/game/Camera';
 
@@ -71,6 +72,11 @@ const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
 // Bullet sprite tracking
 const bulletSprites = new Map<Bullet, THREE.Sprite>();
 
+// Thrust particle effect
+const thrustTexture = new THREE.TextureLoader().load('/textures/thrust_test01.jpg');
+const thrustEffect = new ThrustEffect(thrustTexture);
+scene.add(thrustEffect.points);
+
 // Systems
 const entityManager = new EntityManager();
 entityManager.add(player);
@@ -99,6 +105,9 @@ const gameLoop = new GameLoop(
     if (input.thrust) {
       player.thrust(dt);
     }
+
+    // Update thrust particles
+    thrustEffect.update(dt, input.thrust, player.position.x, player.position.y, player.angle);
 
     // Energy & weapons
     player.updateEnergy(dt);
