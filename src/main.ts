@@ -13,6 +13,8 @@ import { GameEventMgr } from '@/engine/GameEventMgr';
 import { GameEventType } from '@/engine/GameEvent';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, CameraController } from '@/game/Camera';
+import { Sun } from '@/game/Sun';
+import { applySunGravity } from '@/game/Gravity';
 
 // Setup Three.js
 const scene = createScene();
@@ -36,6 +38,9 @@ player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
 const player2 = new Player(GONDI_STATS);
 player2.position = { ...ARENA.PLAYER2_SPAWN };
 player2.previousPosition = { ...ARENA.PLAYER2_SPAWN };
+
+// Create sun
+const sun = new Sun();
 
 // Reusable objects for per-frame rotation (avoids GC pressure)
 const _qHead = new THREE.Quaternion();
@@ -99,10 +104,36 @@ const thrustEffect2 = new ThrustEffect(thrustTexture);
 scene.add(thrustEffect1.points);
 scene.add(thrustEffect2.points);
 
+// Sun mesh — animated sphere with sprite sheet atlas
+const SUN_ATLAS_COLS = 8;
+const SUN_ATLAS_ROWS = 8;
+
+const sunTexture = new THREE.TextureLoader().load('/textures/sun_atlas.jpg');
+sunTexture.repeat.set(1 / SUN_ATLAS_COLS, 1 / SUN_ATLAS_ROWS);
+sunTexture.wrapS = THREE.RepeatWrapping;
+sunTexture.wrapT = THREE.RepeatWrapping;
+
+const sunGeo = new THREE.SphereGeometry(65, 32, 32);
+const sunMat = new THREE.MeshBasicMaterial({
+  map: sunTexture,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+sunMesh.rotation.x = -90 * rad;
+sunMesh.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
+scene.add(sunMesh);
+
+// Sun point light
+const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
+sunLight.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
+scene.add(sunLight);
+
 // Systems
 const entityManager = new EntityManager();
 entityManager.add(player1);
 entityManager.add(player2);
+entityManager.add(sun);
 const input = new InputManager();
 const cameraController = new CameraController();
 
@@ -111,6 +142,7 @@ const collisionDetector = new CollisionDetector();
 const collisionHandler = new CollisionHandler();
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.BulletHit);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision);
+GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SunCollision);
 
 // Dev helper: faint arena boundary
 const boundaryGeo = new THREE.EdgesGeometry(
@@ -190,6 +222,17 @@ const gameLoop = new GameLoop(
     // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     entityManager.update(dt, camCenter);
+
+    // Sun gravity — applied to players only (matches original C++)
+    applySunGravity(player1, ARENA.SUN_POSITION, dt);
+    applySunGravity(player2, ARENA.SUN_POSITION, dt);
+
+    // Sun animation
+    sun.updateAnimation(dt);
+    const frameIndex = Math.floor(sun.currentFrame);
+    const col = frameIndex % SUN_ATLAS_COLS;
+    const row = Math.floor(frameIndex / SUN_ATLAS_COLS);
+    sunTexture.offset.set(col / SUN_ATLAS_COLS, 1 - (row + 1) / SUN_ATLAS_ROWS);
 
     // Update camera to track both players
     cameraController.update(
