@@ -26,9 +26,15 @@ window.addEventListener('resize', () => {
 const player = new Player(GONDI_STATS);
 player.position = { ...ARENA.PLAYER1_SPAWN };
 
+// Reusable objects for per-frame rotation (avoids GC pressure)
+const _qHead = new THREE.Quaternion();
+const _qRoll = new THREE.Quaternion();
+const _zAxis = new THREE.Vector3(0, 0, 1);
+const _fwd = new THREE.Vector3();
+
 // Load Gondi model (with fallback to placeholder)
 // The outer group receives per-frame gameplay rotation (0, rollAngle, angle).
-// The inner model gets the one-time base orientation (-90, 0, 90) matching gondi.cpp:53.
+// The inner model gets a one-time base orientation (0, 270, 90) to face +Y (up on screen).
 const loader = new GLTFLoader();
 let playerMesh: THREE.Object3D | null = null;
 const rad = Math.PI / 180;
@@ -37,10 +43,9 @@ loader.load(
   '/models/gondi.glb',
   (gltf) => {
     const container = new THREE.Group();
-    container.rotation.order = 'ZXY'; // Match Irrlicht's rotation order
     const model = gltf.scene;
     model.scale.set(1.8, 1.8, 1.8);
-    model.rotation.set(-90 * rad, 0, 0);
+    model.rotation.set(0, 270 * rad, 90 * rad);
     container.add(model);
     scene.add(container);
     playerMesh = container;
@@ -49,11 +54,10 @@ loader.load(
   () => {
     console.warn('Could not load gondi.glb, using placeholder');
     const container = new THREE.Group();
-    container.rotation.order = 'ZXY'; // Match Irrlicht's rotation order
     const geo = new THREE.ConeGeometry(8, 20, 8);
     const mat = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.set(-90 * rad, 0, 0);
+    mesh.rotation.set(0, 270 * rad, 90 * rad);
     container.add(mesh);
     scene.add(container);
     playerMesh = container;
@@ -78,9 +82,9 @@ const gameLoop = new GameLoop(
   (dt: number) => {
     // Process input
     if (input.rotateLeft) {
-      player.rotate(1, dt);
-    } else if (input.rotateRight) {
       player.rotate(-1, dt);
+    } else if (input.rotateRight) {
+      player.rotate(1, dt);
     } else {
       player.resetRoll(dt);
     }
@@ -99,9 +103,12 @@ const gameLoop = new GameLoop(
     // Sync mesh to player state
     if (playerMesh) {
       playerMesh.position.set(player.position.x, player.position.y, player.position.z);
-      // Per-frame gameplay rotation: (0, rollAngle, angle) matching original player.cpp:173
-      // Base model orientation is baked into the inner child at load time
-      playerMesh.rotation.set(0, player.rollAngle * rad, player.angle * rad);
+      // Heading: Rz(+angle) matches physics direction (-sin(a), cos(a))
+      // Roll: rotate around the ship's actual forward axis for clean banking
+      const headingQ = _qHead.setFromAxisAngle(_zAxis, player.angle * rad);
+      const forward = _fwd.set(0, 1, 0).applyQuaternion(headingQ);
+      const rollQ = _qRoll.setFromAxisAngle(forward, -player.rollAngle * rad);
+      playerMesh.quaternion.copy(rollQ.multiply(headingQ));
     }
 
     // Move stars with camera
