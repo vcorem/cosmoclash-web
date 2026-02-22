@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock THREE since ThrustEffect creates Three.js objects
 vi.mock('three', () => {
-  const Float32BufferAttribute = vi.fn().mockImplementation((array: Float32Array, itemSize: number) => ({
+  const BufferAttribute = vi.fn().mockImplementation((array: Float32Array, itemSize: number) => ({
     array,
     itemSize,
     needsUpdate: false,
@@ -21,7 +21,7 @@ vi.mock('three', () => {
     })
   );
   return {
-    Float32BufferAttribute,
+    BufferAttribute,
     BufferGeometry,
     ShaderMaterial,
     Points,
@@ -40,7 +40,7 @@ describe('ThrustEffect', () => {
       expect(THRUST_CONFIG.MAX_LIFETIME).toBe(400);
       expect(THRUST_CONFIG.SPAWN_OFFSET).toBe(25);
       expect(THRUST_CONFIG.SPREAD).toBe(3);
-      expect(THRUST_CONFIG.PARTICLE_SIZE).toBe(20);
+      expect(THRUST_CONFIG.PARTICLE_SIZE).toBe(150);
     });
   });
 

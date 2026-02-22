@@ -7,7 +7,7 @@ export const THRUST_CONFIG = {
   MAX_LIFETIME: 400,    // ms
   SPAWN_OFFSET: 25,     // units behind ship
   SPREAD: 3,            // ±units perpendicular
-  PARTICLE_SIZE: 20,
+  PARTICLE_SIZE: 150,
 } as const;
 
 export class ThrustEffect {
@@ -19,8 +19,8 @@ export class ThrustEffect {
   private nextIndex = 0;
   private timeSinceLastEmit = 0;
   private geometry: THREE.BufferGeometry;
-  private posAttr: THREE.Float32BufferAttribute;
-  private opacityAttr: THREE.Float32BufferAttribute;
+  private posAttr: THREE.BufferAttribute;
+  private opacityAttr: THREE.BufferAttribute;
 
   constructor(texture: THREE.Texture) {
     const n = THRUST_CONFIG.POOL_SIZE;
@@ -40,8 +40,8 @@ export class ThrustEffect {
     }
 
     this.geometry = new THREE.BufferGeometry();
-    this.posAttr = new THREE.Float32BufferAttribute(this.positions, 3);
-    this.opacityAttr = new THREE.Float32BufferAttribute(this.opacities, 1);
+    this.posAttr = new THREE.BufferAttribute(this.positions, 3);
+    this.opacityAttr = new THREE.BufferAttribute(this.opacities, 1);
     this.geometry.setAttribute('position', this.posAttr);
     this.geometry.setAttribute('opacity', this.opacityAttr);
 
@@ -75,6 +75,7 @@ export class ThrustEffect {
     });
 
     this.points = new THREE.Points(this.geometry, material);
+    this.points.frustumCulled = false;
   }
 
   getOpacity(index: number): number {
