@@ -19,6 +19,7 @@ import { createCamera, CameraController } from '@/game/Camera';
 import { Sun } from '@/game/Sun';
 import { applySunGravity } from '@/game/Gravity';
 import { Snot, SNOT_CONFIG } from '@/game/Snot';
+import { Asteroid } from '@/game/Asteroid';
 
 // Setup Three.js
 const scene = createScene();
@@ -257,6 +258,73 @@ function spawnExplosion(x: number, y: number, z: number): void {
   scene.add(sprite);
 }
 
+// Asteroid pool with 3D mesh management
+const asteroidPool = new EntityPool<Asteroid>(
+  () => new Asteroid(0),
+  () => { /* reset called per-acquire with specific type */ },
+  ARENA.ASTEROID_COUNT,
+);
+const asteroidMeshMap = new Map<Asteroid, THREE.Group>();
+
+// Load asteroid glTF models (3 types)
+const asteroidModels: THREE.Group[] = [];
+let asteroidModelsLoaded = 0;
+
+function loadAsteroidModels(onAllLoaded: () => void): void {
+  for (let i = 0; i < 3; i++) {
+    const filename = `/models/asteroid0${i + 1}.glb`;
+    loader.load(
+      filename,
+      (gltf) => {
+        const model = gltf.scene;
+        model.scale.set(
+          ARENA.ASTEROID_MESH_SCALE,
+          ARENA.ASTEROID_MESH_SCALE,
+          ARENA.ASTEROID_MESH_SCALE,
+        );
+        asteroidModels[i] = model;
+        asteroidModelsLoaded++;
+        if (asteroidModelsLoaded === 3) onAllLoaded();
+      },
+      undefined,
+      () => {
+        console.warn(`Could not load ${filename}, using placeholder`);
+        const geo = new THREE.IcosahedronGeometry(ARENA.ASTEROID_COLLISION_RADII[i], 1);
+        const mat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+        const mesh = new THREE.Mesh(geo, mat);
+        const group = new THREE.Group();
+        group.add(mesh);
+        asteroidModels[i] = group;
+        asteroidModelsLoaded++;
+        if (asteroidModelsLoaded === 3) onAllLoaded();
+      },
+    );
+  }
+}
+
+function spawnAsteroids(): void {
+  for (let i = 0; i < ARENA.ASTEROID_COUNT; i++) {
+    const type = Math.floor(Math.random() * 3);
+    const asteroid = asteroidPool.acquire();
+    asteroid.reset(type);
+    asteroid.position = {
+      x: ARENA.WRAP_X - Math.random() * ARENA.WRAP_X * 2,
+      y: ARENA.WRAP_Y - Math.random() * ARENA.WRAP_Y * 2,
+      z: 0,
+    };
+    asteroid.previousPosition = { ...asteroid.position };
+
+    const meshClone = asteroidModels[type].clone();
+    meshClone.position.set(asteroid.position.x, asteroid.position.y, 0);
+    scene.add(meshClone);
+    asteroidMeshMap.set(asteroid, meshClone);
+  }
+}
+
+loadAsteroidModels(() => {
+  spawnAsteroids();
+});
+
 // Sun point light
 const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
 sunLight.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
@@ -395,6 +463,7 @@ const gameLoop = new GameLoop(
       ...entityManager.entities,
       ...bulletPool.activeEntities,
       ...snotPool.activeEntities,
+      ...asteroidPool.activeEntities,
     ];
     collisionDetector.checkCollisions(allEntities);
     enforceMinimumDistance(player1, player2);
@@ -419,6 +488,12 @@ const gameLoop = new GameLoop(
       snot.handleWrapAround(camCenter);
     });
 
+    // Update pooled asteroids
+    asteroidPool.forEachActive((asteroid) => {
+      asteroid.update(dt);
+      asteroid.handleWrapAround(camCenter);
+    });
+
     // Sun gravity — applied to players only (matches original C++)
     applySunGravity(player1, ARENA.SUN_POSITION, dt);
     applySunGravity(player2, ARENA.SUN_POSITION, dt);
@@ -428,6 +503,11 @@ const gameLoop = new GameLoop(
       if (!snot.attached) {
         applySunGravity(snot, ARENA.SUN_POSITION, dt);
       }
+    });
+
+    // Sun gravity on asteroids
+    asteroidPool.forEachActive((asteroid) => {
+      applySunGravity(asteroid, ARENA.SUN_POSITION, dt);
     });
 
     // Sun animation
@@ -508,6 +588,25 @@ const gameLoop = new GameLoop(
       if (!expl.alive) {
         sprite.visible = false;
         scene.remove(sprite);
+      }
+    }
+
+    // Sync asteroid meshes
+    asteroidPool.forEachActive((asteroid) => {
+      const mesh = asteroidMeshMap.get(asteroid);
+      if (!mesh) return;
+      mesh.position.set(asteroid.position.x, asteroid.position.y, asteroid.position.z);
+      mesh.rotation.set(
+        asteroid.curXAngle * rad,
+        asteroid.curYAngle * rad,
+        0,
+      );
+    });
+    asteroidPool.releaseInactive();
+    for (const [asteroid, mesh] of asteroidMeshMap) {
+      if (!asteroid.alive) {
+        mesh.visible = false;
+        scene.remove(mesh);
       }
     }
 
