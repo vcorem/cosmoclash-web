@@ -17,7 +17,7 @@ import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, CameraController } from '@/game/Camera';
 import { Sun } from '@/game/Sun';
 import { applySunGravity } from '@/game/Gravity';
-import { Snot } from '@/game/Snot';
+import { Snot, SNOT_CONFIG } from '@/game/Snot';
 
 // Setup Three.js
 const scene = createScene();
@@ -184,7 +184,36 @@ snotTexture.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
 snotTexture.wrapS = THREE.RepeatWrapping;
 snotTexture.wrapT = THREE.RepeatWrapping;
 
-const snotSprites = new Map<Snot, { sprite: THREE.Sprite; texture: THREE.Texture }>();
+const SNOT_POOL_SIZE = 80;
+const snotPool = new EntityPool<Snot>(
+  () => new Snot(player1, player2),
+  () => { /* reset called per-acquire */ },
+  SNOT_POOL_SIZE,
+);
+const snotSpriteMap = new Map<Snot, { sprite: THREE.Sprite; texture: THREE.Texture }>();
+
+function acquireSnot(origin: Entity, target: Player): Snot {
+  const snot = snotPool.acquire();
+  snot.resetSnot(origin, target);
+  if (!snotSpriteMap.has(snot)) {
+    const mat = new THREE.SpriteMaterial({
+      map: snotTexture.clone(),
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+    });
+    mat.map!.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
+    mat.map!.wrapS = THREE.RepeatWrapping;
+    mat.map!.wrapT = THREE.RepeatWrapping;
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(ARENA.SNOT_BILLBOARD_SIZE, ARENA.SNOT_BILLBOARD_SIZE, 1);
+    snotSpriteMap.set(snot, { sprite, texture: mat.map! });
+  }
+  const { sprite } = snotSpriteMap.get(snot)!;
+  sprite.visible = true;
+  scene.add(sprite);
+  return snot;
+}
 
 // Sun point light
 const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
@@ -264,22 +293,22 @@ function updatePlayerInput(
   }
 
   if (pi.fireSecondary) {
-    const snot = player.fireSecondary(enemy);
-    if (snot) {
-      entityManager.add(snot);
-      const mat = new THREE.SpriteMaterial({
-        map: snotTexture.clone(),
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        transparent: true,
-      });
-      mat.map!.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
-      mat.map!.wrapS = THREE.RepeatWrapping;
-      mat.map!.wrapT = THREE.RepeatWrapping;
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(ARENA.SNOT_BILLBOARD_SIZE, ARENA.SNOT_BILLBOARD_SIZE, 1);
-      scene.add(sprite);
-      snotSprites.set(snot, { sprite, texture: mat.map! });
+    if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
+      player.energy -= player.stats.primaryEnergyCost;
+      player.secondaryCooldown = ARENA.SECONDARY_WEAPON_DELAY;
+
+      const snot = acquireSnot(player, enemy);
+      snot.angle = player.angle;
+
+      const spawnVec = player.getFullSpeedVec(25);
+      snot.position = {
+        x: player.position.x + spawnVec.x,
+        y: player.position.y + spawnVec.y,
+        z: player.position.z,
+      };
+      snot.previousPosition = { ...snot.position };
+      const speedVec = player.getFullSpeedVec(SNOT_CONFIG.speedMaxScaler);
+      snot.accelVec = { ...speedVec };
     }
   }
 }
@@ -303,6 +332,7 @@ const gameLoop = new GameLoop(
     const allEntities = [
       ...entityManager.entities,
       ...bulletPool.activeEntities,
+      ...snotPool.activeEntities,
     ];
     collisionDetector.checkCollisions(allEntities);
     enforceMinimumDistance(player1, player2);
@@ -321,16 +351,22 @@ const gameLoop = new GameLoop(
       bullet.handleWrapAround(camCenter);
     });
 
+    // Update pooled snots
+    snotPool.forEachActive((snot) => {
+      snot.update(dt);
+      snot.handleWrapAround(camCenter);
+    });
+
     // Sun gravity — applied to players only (matches original C++)
     applySunGravity(player1, ARENA.SUN_POSITION, dt);
     applySunGravity(player2, ARENA.SUN_POSITION, dt);
 
     // Sun gravity on snots in flight
-    for (const [snot] of snotSprites) {
+    snotPool.forEachActive((snot) => {
       if (!snot.attached) {
         applySunGravity(snot, ARENA.SUN_POSITION, dt);
       }
-    }
+    });
 
     // Sun animation
     sun.updateAnimation(dt);
@@ -365,20 +401,22 @@ const gameLoop = new GameLoop(
       }
     }
 
-    // Sync snot sprites: update position and animation frame
-    for (const [snot, { sprite, texture }] of snotSprites) {
+    // Sync snot sprites
+    snotPool.forEachActive((snot) => {
+      const entry = snotSpriteMap.get(snot);
+      if (!entry) return;
+      const { sprite, texture } = entry;
+      sprite.position.set(snot.position.x, snot.position.y, snot.position.z);
+      const frameIndex = Math.floor(snot.currentFrame);
+      const sCol = frameIndex % SNOT_ATLAS_COLS;
+      const sRow = Math.floor(frameIndex / SNOT_ATLAS_COLS);
+      texture.offset.set(sCol / SNOT_ATLAS_COLS, 1 - (sRow + 1) / SNOT_ATLAS_ROWS);
+    });
+    snotPool.releaseInactive();
+    for (const [snot, { sprite }] of snotSpriteMap) {
       if (!snot.alive) {
+        sprite.visible = false;
         scene.remove(sprite);
-        (sprite.material as THREE.SpriteMaterial).dispose();
-        texture.dispose();
-        snotSprites.delete(snot);
-      } else {
-        sprite.position.set(snot.position.x, snot.position.y, snot.position.z);
-        // Update atlas frame
-        const frameIndex = Math.floor(snot.currentFrame);
-        const col = frameIndex % SNOT_ATLAS_COLS;
-        const row = Math.floor(frameIndex / SNOT_ATLAS_COLS);
-        texture.offset.set(col / SNOT_ATLAS_COLS, 1 - (row + 1) / SNOT_ATLAS_ROWS);
       }
     }
 

@@ -24,6 +24,25 @@ export class Snot extends Bullet {
     this.target = target;
   }
 
+  resetSnot(origin: Entity, target: Player): void {
+    this.config = SNOT_CONFIG;
+    this.originEntity = origin;
+    this.ttl = SNOT_CONFIG.maxTtl;
+    this.alive = true;
+    this.position = { x: 0, y: 0, z: 0 };
+    this.previousPosition = { x: 0, y: 0, z: 0 };
+    this.accelVec = { x: 0, y: 0, z: 0 };
+    this.angle = 0;
+    this.health = 1;
+    this.entityType = EntityType.Snot;
+    this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: SNOT_CONFIG.collisionRadius }];
+    this.target = target;
+    this.attached = false;
+    this.victim = null;
+    this.currentFrame = 0;
+    this.orbitOffset = { x: 0, y: 0, z: 0 };
+  }
+
   attachTo(victim: Player): void {
     this.attached = true;
     this.victim = victim;
