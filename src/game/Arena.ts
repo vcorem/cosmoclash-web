@@ -20,4 +20,14 @@ export const ARENA = {
   // Spawn positions
   PLAYER1_SPAWN: { x: -500, y: -70, z: 0 },
   PLAYER2_SPAWN: { x: 500, y: -70, z: 0 },
+
+  // Sun
+  SUN_POSITION: { x: 0, y: 0, z: 0 },
+  SUN_COLLISION_RADIUS: 65,
+  SUN_DAMAGE: 0.02,
+
+  // Gravity
+  GRAVITY_RANGE: 450,
+  GRAVITY_CONSTANT: 0.5,
+  GRAVITY_MAX_FORCE: 0.001,
 } as const;
