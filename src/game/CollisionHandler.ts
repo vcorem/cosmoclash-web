@@ -1,6 +1,7 @@
 import { GameEventListener } from '@/engine/GameEventMgr';
-import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent } from '@/engine/GameEvent';
-import { Entity } from '@/engine/Entity';
+import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent, SunCollisionEvent } from '@/engine/GameEvent';
+import { Entity, EntityType } from '@/engine/Entity';
+import { ARENA } from './Arena';
 import { Bullet } from './Bullet';
 
 const COLLISION_DAMAGE_SCALE = 0.2;
@@ -18,6 +19,8 @@ export class CollisionHandler implements GameEventListener {
       this.handleBulletHit(event as BulletHitEvent);
     } else if (event.type === GameEventType.Collision) {
       this.handleShipCollision(event as CollisionEvent);
+    } else if (event.type === GameEventType.SunCollision) {
+      this.handleSunCollision(event as SunCollisionEvent);
     }
   }
 
@@ -119,6 +122,50 @@ export class CollisionHandler implements GameEventListener {
     // B deflects away from A (along normal direction A→B)
     b.accelVec = { x: nx * bBounce, y: ny * bBounce, z: 0 };
 
+  }
+
+  private handleSunCollision(event: SunCollisionEvent): void {
+    const sun = event.sun;
+    const other = event.other;
+
+    // Damage the non-sun entity
+    other.health -= ARENA.SUN_DAMAGE;
+    if (other.health <= 0) {
+      other.destroy();
+    }
+
+    // Compute collision normal (sun → other)
+    const radiusSun = sun.collisionSpheres[0]?.radius ?? 0;
+    const radiusOther = other.collisionSpheres[0]?.radius ?? 0;
+
+    let nx = other.position.x - sun.position.x;
+    let ny = other.position.y - sun.position.y;
+    let dist = Math.sqrt(nx * nx + ny * ny);
+
+    if (dist < 0.001) {
+      nx = 1; ny = 0; dist = 0;
+    } else {
+      nx /= dist;
+      ny /= dist;
+    }
+
+    // Push other entity outside sun collision radius
+    const targetDist = radiusSun + radiusOther + 8;
+    if (dist < targetDist) {
+      other.position.x = sun.position.x + nx * targetDist;
+      other.position.y = sun.position.y + ny * targetDist;
+    }
+
+    other.previousPosition = { ...other.position };
+
+    // Bounce: redirect velocity away from sun
+    const speed = Math.sqrt(
+      other.accelVec.x * other.accelVec.x +
+      other.accelVec.y * other.accelVec.y +
+      other.accelVec.z * other.accelVec.z,
+    );
+    const bounce = Math.max(speed, MIN_BOUNCE_SPEED);
+    other.accelVec = { x: nx * bounce, y: ny * bounce, z: 0 };
   }
 }
 

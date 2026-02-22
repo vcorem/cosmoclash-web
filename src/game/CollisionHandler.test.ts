@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
-import { BulletHitEvent, CollisionEvent } from '@/engine/GameEvent';
+import { BulletHitEvent, CollisionEvent, SunCollisionEvent } from '@/engine/GameEvent';
 
 describe('CollisionHandler', () => {
   let handler: CollisionHandler;
@@ -337,6 +337,117 @@ describe('CollisionHandler', () => {
 
       expect(a.accelVec.x).toBe(1);
       expect(b.accelVec.x).toBe(-1);
+    });
+  });
+
+  describe('sun collision', () => {
+    it('applies SUN_DAMAGE to the non-sun entity', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.health = 1;
+      player.position = { x: 60, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      expect(player.health).toBeCloseTo(1 - 0.02);
+    });
+
+    it('does not damage the sun', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.health = 1;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.position = { x: 60, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      expect(sun.health).toBe(1);
+    });
+
+    it('bounces the player away from the sun', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.position = { x: 60, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 }; // moving toward sun
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      // Player velocity should now point away from sun (positive X)
+      expect(player.accelVec.x).toBeGreaterThan(0);
+    });
+
+    it('does not move the sun', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.position = { x: 60, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      expect(sun.position).toEqual({ x: 0, y: 0, z: 0 });
+      expect(sun.accelVec).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it('pushes the player outside the sun collision radius', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.position = { x: 50, y: 0, z: 0 }; // inside sun radius
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      const dist = Math.sqrt(player.position.x ** 2 + player.position.y ** 2);
+      expect(dist).toBeGreaterThanOrEqual(65 + 14);
+    });
+
+    it('destroys the player if health reaches 0', () => {
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+      sun.position = { x: 0, y: 0, z: 0 };
+      sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+
+      const player = new Entity();
+      player.health = 0.01;
+      player.position = { x: 60, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+      player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+
+      const evt = new SunCollisionEvent(sun, player);
+      handler.onGameEvent(evt);
+
+      expect(player.health).toBeLessThanOrEqual(0);
+      expect(player.alive).toBe(false);
     });
   });
 });
