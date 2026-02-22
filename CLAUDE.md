@@ -50,15 +50,16 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 
 ## Current Implementation State
 
-**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions)
+**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids)
 
 **Tech stack:** Three.js, TypeScript, Vite, Vitest
 
 **Key architecture patterns:**
-- `EntityPool<T>` (`src/engine/EntityPool.ts`) — generic free-list pool for bullets (50), snots (80), explosions (15). Pools manage entity lifecycle; sprites are tracked in separate `Map<Entity, THREE.Sprite>` alongside the pool
-- `GameEventMgr` singleton with `sendEvent()` / `addListener()` — used for explosion triggers on player death
-- `CollisionHandler` emits `ExplosionEvent` when a Player dies (bullet hit, ship collision, sun collision)
-- Pooled entities (bullets, snots, explosions) live OUTSIDE `EntityManager` — they have their own update/sync loops in `main.ts`. `EntityManager` only holds players + sun
+- `EntityPool<T>` (`src/engine/EntityPool.ts`) — generic free-list pool for bullets (50), snots (80), explosions (15), asteroids (10). Pools manage entity lifecycle; sprites/meshes are tracked in separate `Map<Entity, THREE.Sprite|THREE.Group>` alongside the pool
+- `GameEventMgr` singleton with `sendEvent()` / `addListener()` — used for explosion triggers on player/asteroid death
+- `CollisionHandler` emits `ExplosionEvent` when a Player dies or an Asteroid is destroyed by bullet (one-shot kill)
+- Pooled entities (bullets, snots, explosions, asteroids) live OUTSIDE `EntityManager` — they have their own update/sync loops in `main.ts`. `EntityManager` only holds players + sun
+- Asteroids: 3 types with different collision radii (8, 18, 15), 3D glTF meshes with rotation, gravity-affected, wrap-around. Asteroid-player = bounce only (no damage). Asteroid-bullet = instant destroy + explosion
 - Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion
 
 **Input bindings:**
