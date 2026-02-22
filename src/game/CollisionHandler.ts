@@ -33,7 +33,13 @@ export class CollisionHandler implements GameEventListener {
     const target = event.target;
 
     // Sun is indestructible — bullets die on contact but deal no damage
-    if (target.entityType !== EntityType.Sun) {
+    if (target.entityType === EntityType.Sun) {
+      // no damage
+    } else if (target.entityType === EntityType.Asteroid) {
+      // Asteroids are one-shot killed by any bullet (matches C++)
+      target.destroy();
+      GameEventMgr.getInstance().sendEvent(new ExplosionEvent(target));
+    } else {
       target.health -= bullet.config.damage;
       if (target.health <= 0) {
         target.destroy();
@@ -50,26 +56,33 @@ export class CollisionHandler implements GameEventListener {
     const a = event.entityA;
     const b = event.entityB;
 
-    // --- Damage based on relative velocity ---
-    const rvx = a.accelVec.x - b.accelVec.x;
-    const rvy = a.accelVec.y - b.accelVec.y;
-    const rvz = a.accelVec.z - b.accelVec.z;
-    const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
-    const damage = Math.min(relSpeed * COLLISION_DAMAGE_SCALE, 0.3);
+    // Asteroid-player: bounce only, no damage (matches C++)
+    const hasAsteroid =
+      a.entityType === EntityType.Asteroid ||
+      b.entityType === EntityType.Asteroid;
 
-    a.health -= damage;
-    b.health -= damage;
+    if (!hasAsteroid) {
+      // --- Damage based on relative velocity ---
+      const rvx = a.accelVec.x - b.accelVec.x;
+      const rvy = a.accelVec.y - b.accelVec.y;
+      const rvz = a.accelVec.z - b.accelVec.z;
+      const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
+      const damage = Math.min(relSpeed * COLLISION_DAMAGE_SCALE, 0.3);
 
-    if (a.health <= 0) {
-      a.destroy();
-      if (a.entityType === EntityType.Player) {
-        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(a));
+      a.health -= damage;
+      b.health -= damage;
+
+      if (a.health <= 0) {
+        a.destroy();
+        if (a.entityType === EntityType.Player) {
+          GameEventMgr.getInstance().sendEvent(new ExplosionEvent(a));
+        }
       }
-    }
-    if (b.health <= 0) {
-      b.destroy();
-      if (b.entityType === EntityType.Player) {
-        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(b));
+      if (b.health <= 0) {
+        b.destroy();
+        if (b.entityType === EntityType.Player) {
+          GameEventMgr.getInstance().sendEvent(new ExplosionEvent(b));
+        }
       }
     }
 

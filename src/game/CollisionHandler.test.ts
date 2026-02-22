@@ -2,15 +2,20 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
+import { Asteroid } from './Asteroid';
 import { Snot } from './Snot';
 import { Player, GONDI_STATS } from './Player';
-import { BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent } from '@/engine/GameEvent';
+import { GameEventMgr } from '@/engine/GameEventMgr';
+import { GameEventType, GameEvent, BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent, ExplosionEvent } from '@/engine/GameEvent';
 
 describe('CollisionHandler', () => {
   let handler: CollisionHandler;
 
   beforeEach(() => {
+    GameEventMgr.reset();
     handler = new CollisionHandler();
+    GameEventMgr.getInstance().addListener(handler, GameEventType.BulletHit);
+    GameEventMgr.getInstance().addListener(handler, GameEventType.Collision);
   });
 
   describe('bullet hit', () => {
@@ -405,6 +410,84 @@ describe('CollisionHandler', () => {
 
       expect(a.accelVec.x).toBe(1);
       expect(b.accelVec.x).toBe(-1);
+    });
+  });
+
+  describe('asteroid-bullet', () => {
+    it('destroys asteroid on any bullet hit (one-shot kill)', () => {
+      const asteroid = new Asteroid(0);
+      asteroid.health = 1;
+
+      const shooter = new Entity();
+      const bullet = new Bullet(FLAME_BULLET_CONFIG, shooter);
+
+      const event = new BulletHitEvent(bullet, asteroid);
+      handler.onGameEvent(event);
+
+      expect(asteroid.alive).toBe(false);
+      expect(bullet.alive).toBe(false);
+    });
+
+    it('emits ExplosionEvent when asteroid is destroyed by bullet', () => {
+      const asteroid = new Asteroid(0);
+      const shooter = new Entity();
+      const bullet = new Bullet(FLAME_BULLET_CONFIG, shooter);
+
+      const explosionEvents: GameEvent[] = [];
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => explosionEvents.push(e) },
+        GameEventType.Explosion,
+      );
+
+      const event = new BulletHitEvent(bullet, asteroid);
+      handler.onGameEvent(event);
+
+      expect(explosionEvents).toHaveLength(1);
+      expect(explosionEvents[0]).toBeInstanceOf(ExplosionEvent);
+      expect((explosionEvents[0] as ExplosionEvent).entity).toBe(asteroid);
+    });
+  });
+
+  describe('asteroid-player collision', () => {
+    it('does NOT deal damage to either entity', () => {
+      const asteroid = new Asteroid(0);
+      asteroid.position = { x: 0, y: 0, z: 0 };
+      asteroid.previousPosition = { x: 0, y: 0, z: 0 };
+      asteroid.health = 1;
+
+      const player = new Player(GONDI_STATS);
+      player.position = { x: 5, y: 0, z: 0 };
+      player.previousPosition = { x: 5, y: 0, z: 0 };
+      player.health = 1;
+      player.accelVec = { x: -1, y: 0, z: 0 };
+
+      const event = new CollisionEvent(asteroid, player, 0.5);
+      handler.onGameEvent(event);
+
+      expect(asteroid.health).toBe(1);
+      expect(player.health).toBe(1);
+      expect(asteroid.alive).toBe(true);
+      expect(player.alive).toBe(true);
+    });
+
+    it('still applies bounce physics (velocity deflection)', () => {
+      const asteroid = new Asteroid(0);
+      asteroid.position = { x: 0, y: 0, z: 0 };
+      asteroid.previousPosition = { x: -5, y: 0, z: 0 };
+      asteroid.accelVec = { x: 0.1, y: 0, z: 0 };
+
+      const player = new Player(GONDI_STATS);
+      player.position = { x: 5, y: 0, z: 0 };
+      player.previousPosition = { x: 10, y: 0, z: 0 };
+      player.accelVec = { x: -0.5, y: 0, z: 0 };
+
+      const event = new CollisionEvent(asteroid, player, 0.5);
+      handler.onGameEvent(event);
+
+      // After bounce, asteroid should move away from player (negative x)
+      expect(asteroid.accelVec.x).toBeLessThan(0);
+      // Player should move away from asteroid (positive x)
+      expect(player.accelVec.x).toBeGreaterThan(0);
     });
   });
 
