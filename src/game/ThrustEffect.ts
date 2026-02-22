@@ -2,12 +2,12 @@ import * as THREE from 'three';
 
 export const THRUST_CONFIG = {
   POOL_SIZE: 60,
-  EMIT_RATE: 40,        // particles per second
+  EMIT_RATE: 60,        // particles per second (original: 20-60)
   MIN_LIFETIME: 200,    // ms
   MAX_LIFETIME: 400,    // ms
   SPAWN_OFFSET: 25,     // units behind ship
   SPREAD: 3,            // ±units perpendicular
-  PARTICLE_SIZE: 150,
+  PARTICLE_SIZE: 400,
 } as const;
 
 export class ThrustEffect {

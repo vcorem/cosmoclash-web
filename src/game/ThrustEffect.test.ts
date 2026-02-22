@@ -35,12 +35,12 @@ describe('ThrustEffect', () => {
   describe('THRUST_CONFIG', () => {
     it('has correct values from original game', () => {
       expect(THRUST_CONFIG.POOL_SIZE).toBe(60);
-      expect(THRUST_CONFIG.EMIT_RATE).toBe(40);
+      expect(THRUST_CONFIG.EMIT_RATE).toBe(60);
       expect(THRUST_CONFIG.MIN_LIFETIME).toBe(200);
       expect(THRUST_CONFIG.MAX_LIFETIME).toBe(400);
       expect(THRUST_CONFIG.SPAWN_OFFSET).toBe(25);
       expect(THRUST_CONFIG.SPREAD).toBe(3);
-      expect(THRUST_CONFIG.PARTICLE_SIZE).toBe(150);
+      expect(THRUST_CONFIG.PARTICLE_SIZE).toBe(400);
     });
   });
 

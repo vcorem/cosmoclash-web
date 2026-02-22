@@ -30,10 +30,40 @@ export function createStarField(): THREE.Points {
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-  const material = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 2,
-    sizeAttenuation: true,
+  // Original uses star_test-02.jpg (blue glow) as 10x10 billboard quads
+  // with EMT_TRANSPARENT_ADD_COLOR (additive blending).
+  // ShaderMaterial clamps max point size and applies radial falloff to
+  // prevent close stars from showing square JPEG edges.
+  const starTexture = new THREE.TextureLoader().load('/textures/star_test-02.jpg');
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      map: { value: starTexture },
+      starSize: { value: 30.0 },
+      maxPointSize: { value: 40.0 },
+      viewportHeight: { value: window.innerHeight * window.devicePixelRatio },
+    },
+    vertexShader: `
+      uniform float starSize;
+      uniform float maxPointSize;
+      uniform float viewportHeight;
+      void main() {
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = min(starSize * (viewportHeight * 0.5 / -mvPosition.z), maxPointSize);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D map;
+      void main() {
+        vec4 texColor = texture2D(map, gl_PointCoord);
+        float dist = length(gl_PointCoord - vec2(0.5));
+        if (dist > 0.5) discard;
+        gl_FragColor = texColor;
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
 
   const stars = new THREE.Points(geometry, material);
