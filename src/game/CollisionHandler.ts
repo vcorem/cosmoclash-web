@@ -1,5 +1,5 @@
-import { GameEventListener } from '@/engine/GameEventMgr';
-import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent } from '@/engine/GameEvent';
+import { GameEventListener, GameEventMgr } from '@/engine/GameEventMgr';
+import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent, ExplosionEvent } from '@/engine/GameEvent';
 import { Entity, EntityType } from '@/engine/Entity';
 import { ARENA } from './Arena';
 import { Bullet } from './Bullet';
@@ -37,6 +37,9 @@ export class CollisionHandler implements GameEventListener {
       target.health -= bullet.config.damage;
       if (target.health <= 0) {
         target.destroy();
+        if (target.entityType === EntityType.Player) {
+          GameEventMgr.getInstance().sendEvent(new ExplosionEvent(target));
+        }
       }
     }
 
@@ -57,8 +60,18 @@ export class CollisionHandler implements GameEventListener {
     a.health -= damage;
     b.health -= damage;
 
-    if (a.health <= 0) a.destroy();
-    if (b.health <= 0) b.destroy();
+    if (a.health <= 0) {
+      a.destroy();
+      if (a.entityType === EntityType.Player) {
+        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(a));
+      }
+    }
+    if (b.health <= 0) {
+      b.destroy();
+      if (b.entityType === EntityType.Player) {
+        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(b));
+      }
+    }
 
     // --- Position separation along collision normal ---
     // Port of C++ SceneMelee::OnGameEvent GAMEEVENT_COLLISION handler.
@@ -139,6 +152,9 @@ export class CollisionHandler implements GameEventListener {
     other.health -= ARENA.SUN_DAMAGE;
     if (other.health <= 0) {
       other.destroy();
+      if (other.entityType === EntityType.Player) {
+        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(other));
+      }
     }
 
     // Compute collision normal (sun → other)

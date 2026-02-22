@@ -11,8 +11,9 @@ import { InputManager, PlayerInput } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
 import { CollisionDetector } from '@/engine/CollisionDetector';
 import { CollisionHandler, enforceMinimumDistance } from '@/game/CollisionHandler';
-import { GameEventMgr } from '@/engine/GameEventMgr';
-import { GameEventType } from '@/engine/GameEvent';
+import { GameEventMgr, GameEventListener } from '@/engine/GameEventMgr';
+import { GameEvent, GameEventType, ExplosionEvent } from '@/engine/GameEvent';
+import { Explosion } from '@/game/Explosion';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, CameraController } from '@/game/Camera';
 import { Sun } from '@/game/Sun';
@@ -215,6 +216,47 @@ function acquireSnot(origin: Entity, target: Player): Snot {
   return snot;
 }
 
+// Explosion sprites — animated billboard with sprite sheet atlas
+const EXPL_ATLAS_COLS = ARENA.EXPLOSION_ATLAS_COLS;
+const EXPL_ATLAS_ROWS = ARENA.EXPLOSION_ATLAS_ROWS;
+
+const explosionTexture = new THREE.TextureLoader().load('/textures/explosion_atlas.jpg');
+explosionTexture.repeat.set(1 / EXPL_ATLAS_COLS, 1 / EXPL_ATLAS_ROWS);
+explosionTexture.wrapS = THREE.RepeatWrapping;
+explosionTexture.wrapT = THREE.RepeatWrapping;
+
+const EXPLOSION_POOL_SIZE = 15;
+const explosionPool = new EntityPool<Explosion>(
+  () => new Explosion(),
+  (e) => e.reset(),
+  EXPLOSION_POOL_SIZE,
+);
+const explosionSpriteMap = new Map<Explosion, THREE.Sprite>();
+
+function spawnExplosion(x: number, y: number, z: number): void {
+  const expl = explosionPool.acquire();
+  expl.position = { x, y, z };
+  expl.previousPosition = { x, y, z };
+
+  if (!explosionSpriteMap.has(expl)) {
+    const mat = new THREE.SpriteMaterial({
+      map: explosionTexture.clone(),
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+    });
+    mat.map!.repeat.set(1 / EXPL_ATLAS_COLS, 1 / EXPL_ATLAS_ROWS);
+    mat.map!.wrapS = THREE.RepeatWrapping;
+    mat.map!.wrapT = THREE.RepeatWrapping;
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(ARENA.EXPLOSION_BILLBOARD_SIZE, ARENA.EXPLOSION_BILLBOARD_SIZE, 1);
+    explosionSpriteMap.set(expl, sprite);
+  }
+  const sprite = explosionSpriteMap.get(expl)!;
+  sprite.visible = true;
+  scene.add(sprite);
+}
+
 // Sun point light
 const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
 sunLight.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
@@ -235,6 +277,16 @@ GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.BulletHit
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SunCollision);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SnotHit);
+
+const explosionListener: GameEventListener = {
+  onGameEvent(event: GameEvent) {
+    if (event.type === GameEventType.Explosion) {
+      const e = (event as ExplosionEvent).entity;
+      spawnExplosion(e.position.x, e.position.y, e.position.z);
+    }
+  },
+};
+GameEventMgr.getInstance().addListener(explosionListener, GameEventType.Explosion);
 
 // Dev helper: faint arena boundary
 const boundaryGeo = new THREE.EdgesGeometry(
@@ -386,6 +438,8 @@ const gameLoop = new GameLoop(
     // Sync meshes
     syncMesh(p1Mesh, player1);
     syncMesh(p2Mesh, player2);
+    if (p1Mesh) p1Mesh.visible = player1.alive;
+    if (p2Mesh) p2Mesh.visible = player2.alive;
 
     // Sync bullet sprites and release dead ones
     bulletPool.forEachActive((bullet) => {
@@ -415,6 +469,33 @@ const gameLoop = new GameLoop(
     snotPool.releaseInactive();
     for (const [snot, { sprite }] of snotSpriteMap) {
       if (!snot.alive) {
+        sprite.visible = false;
+        scene.remove(sprite);
+      }
+    }
+
+    // Update explosions
+    explosionPool.forEachActive((expl) => {
+      expl.update(dt);
+      expl.handleWrapAround(camCenter);
+    });
+
+    // Sync explosion sprites
+    explosionPool.forEachActive((expl) => {
+      const sprite = explosionSpriteMap.get(expl);
+      if (!sprite) return;
+      sprite.position.set(expl.position.x, expl.position.y, expl.position.z);
+      const eFrameIndex = Math.floor(expl.currentFrame);
+      const eCol = eFrameIndex % EXPL_ATLAS_COLS;
+      const eRow = Math.floor(eFrameIndex / EXPL_ATLAS_COLS);
+      (sprite.material as THREE.SpriteMaterial).map!.offset.set(
+        eCol / EXPL_ATLAS_COLS,
+        1 - (eRow + 1) / EXPL_ATLAS_ROWS,
+      );
+    });
+    explosionPool.releaseInactive();
+    for (const [expl, sprite] of explosionSpriteMap) {
+      if (!expl.alive) {
         sprite.visible = false;
         scene.remove(sprite);
       }
