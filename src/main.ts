@@ -152,7 +152,7 @@ scene.add(sunGlow);
 const SNOT_ATLAS_COLS = ARENA.SNOT_ATLAS_COLS;
 const SNOT_ATLAS_ROWS = ARENA.SNOT_ATLAS_ROWS;
 
-const snotTexture = new THREE.TextureLoader().load('/textures/snot_atlas.jpg');
+const snotTexture = new THREE.TextureLoader().load('/textures/snot_atlas.png');
 snotTexture.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
 snotTexture.wrapS = THREE.RepeatWrapping;
 snotTexture.wrapT = THREE.RepeatWrapping;

@@ -67,7 +67,7 @@ export class Snot extends Bullet {
 
     if (this.attached && this.victim) {
       // Orbit: rotate offset on XZ and XY planes
-      const rotSpeed = ARENA.SNOT_ORBIT_SPEED * dt;
+      const rotSpeed = ARENA.SNOT_ORBIT_SPEED * dt / 1000;
       const cosR = Math.cos(rotSpeed);
       const sinR = Math.sin(rotSpeed);
 
