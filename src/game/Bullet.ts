@@ -15,7 +15,7 @@ export const FLAME_BULLET_CONFIG: BulletConfig = {
 };
 
 export class Bullet extends Entity {
-  readonly config: BulletConfig;
+  config: BulletConfig;
   originEntity: Entity | null;
   ttl: number;
 
@@ -26,6 +26,19 @@ export class Bullet extends Entity {
     this.config = config;
     this.originEntity = originEntity;
     this.ttl = config.maxTtl;
+  }
+
+  reset(config: BulletConfig, originEntity: Entity | null): void {
+    this.config = config;
+    this.originEntity = originEntity;
+    this.ttl = config.maxTtl;
+    this.alive = true;
+    this.position = { x: 0, y: 0, z: 0 };
+    this.previousPosition = { x: 0, y: 0, z: 0 };
+    this.accelVec = { x: 0, y: 0, z: 0 };
+    this.angle = 0;
+    this.health = 1;
+    this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: config.collisionRadius }];
   }
 
   update(dt: number): void {

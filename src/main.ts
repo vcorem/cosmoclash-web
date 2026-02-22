@@ -4,7 +4,9 @@ import { GameLoop } from '@/engine/GameLoop';
 import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
 import { ARENA } from '@/game/Arena';
-import { Bullet } from '@/game/Bullet';
+import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from '@/game/Bullet';
+import { Entity } from '@/engine/Entity';
+import { EntityPool } from '@/engine/EntityPool';
 import { InputManager, PlayerInput } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
 import { CollisionDetector } from '@/engine/CollisionDetector';
@@ -95,8 +97,33 @@ loadShipModel((mesh) => {
 // Load flame texture
 const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
 
-// Bullet sprite tracking
-const bulletSprites = new Map<Bullet, THREE.Sprite>();
+// Bullet pool with sprite management
+const BULLET_POOL_SIZE = 50;
+const bulletPool = new EntityPool<Bullet>(
+  () => new Bullet(FLAME_BULLET_CONFIG),
+  () => { /* reset called per-acquire with specific config */ },
+  BULLET_POOL_SIZE,
+);
+const bulletSpriteMap = new Map<Bullet, THREE.Sprite>();
+
+function acquireBullet(config: BulletConfig, origin: Entity): Bullet {
+  const bullet = bulletPool.acquire();
+  bullet.reset(config, origin);
+  if (!bulletSpriteMap.has(bullet)) {
+    const mat = new THREE.SpriteMaterial({
+      map: flameTexture,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(35, 35, 1);
+    bulletSpriteMap.set(bullet, sprite);
+  }
+  const sprite = bulletSpriteMap.get(bullet)!;
+  sprite.visible = true;
+  scene.add(sprite);
+  return bullet;
+}
 
 // Thrust particle effects (one per player)
 const thrustTexture = new THREE.TextureLoader().load('/textures/thrust_test01.jpg');
@@ -217,18 +244,22 @@ function updatePlayerInput(
   player.updateEnergy(dt);
 
   if (pi.firePrimary) {
-    const bullet = player.firePrimary();
-    if (bullet) {
-      entityManager.add(bullet);
-      const mat = new THREE.SpriteMaterial({
-        map: flameTexture,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const sprite = new THREE.Sprite(mat);
-      sprite.scale.set(35, 35, 1);
-      scene.add(sprite);
-      bulletSprites.set(bullet, sprite);
+    if (player.primaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
+      player.energy -= player.stats.primaryEnergyCost;
+      player.primaryCooldown = player.stats.primaryWeaponDelay;
+
+      const bullet = acquireBullet(player.stats.primaryBulletConfig, player);
+      bullet.angle = player.angle;
+
+      const spawnVec = player.getFullSpeedVec(25);
+      bullet.position = {
+        x: player.position.x + spawnVec.x,
+        y: player.position.y + spawnVec.y,
+        z: player.position.z,
+      };
+      bullet.previousPosition = { ...bullet.position };
+      const speedVec = player.getFullSpeedVec(player.stats.primaryBulletConfig.speedMaxScaler);
+      bullet.accelVec = { ...speedVec };
     }
   }
 
@@ -269,7 +300,11 @@ const gameLoop = new GameLoop(
     // Collision detection FIRST (matches original C++ loop order).
     // Running before input/movement means deflected velocities are already
     // set when thrust is applied, preventing ships from re-entering overlap.
-    collisionDetector.checkCollisions(entityManager.entities);
+    const allEntities = [
+      ...entityManager.entities,
+      ...bulletPool.activeEntities,
+    ];
+    collisionDetector.checkCollisions(allEntities);
     enforceMinimumDistance(player1, player2);
 
     // Process input for both players
@@ -279,6 +314,12 @@ const gameLoop = new GameLoop(
     // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     entityManager.update(dt, camCenter);
+
+    // Update pooled bullets
+    bulletPool.forEachActive((bullet) => {
+      bullet.update(dt);
+      bullet.handleWrapAround(camCenter);
+    });
 
     // Sun gravity — applied to players only (matches original C++)
     applySunGravity(player1, ARENA.SUN_POSITION, dt);
@@ -310,14 +351,17 @@ const gameLoop = new GameLoop(
     syncMesh(p1Mesh, player1);
     syncMesh(p2Mesh, player2);
 
-    // Sync bullet sprites and remove dead ones
-    for (const [bullet, sprite] of bulletSprites) {
+    // Sync bullet sprites and release dead ones
+    bulletPool.forEachActive((bullet) => {
+      const sprite = bulletSpriteMap.get(bullet);
+      if (!sprite) return;
+      sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
+    });
+    bulletPool.releaseInactive();
+    for (const [bullet, sprite] of bulletSpriteMap) {
       if (!bullet.alive) {
+        sprite.visible = false;
         scene.remove(sprite);
-        sprite.material.dispose();
-        bulletSprites.delete(bullet);
-      } else {
-        sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
       }
     }
 
