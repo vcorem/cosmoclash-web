@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Player, GONDI_STATS } from './Player';
 import { FLAME_BULLET_CONFIG } from './Bullet';
+import { Snot, SNOT_CONFIG } from './Snot';
 import { EntityType } from '@/engine/Entity';
 
 describe('Player', () => {
@@ -230,6 +231,66 @@ describe('Player', () => {
     });
   });
 
+  describe('snot debuff', () => {
+    it('starts with zero snotCount', () => {
+      const p = new Player(GONDI_STATS);
+      expect(p.snotCount).toBe(0);
+    });
+
+    it('addSnot increments count', () => {
+      const p = new Player(GONDI_STATS);
+      p.addSnot();
+      expect(p.snotCount).toBe(1);
+      p.addSnot();
+      expect(p.snotCount).toBe(2);
+    });
+
+    it('removeSnot decrements count', () => {
+      const p = new Player(GONDI_STATS);
+      p.addSnot();
+      p.addSnot();
+      p.removeSnot();
+      expect(p.snotCount).toBe(1);
+    });
+
+    it('getEffectiveMaxSpeed returns base / (snotCount + 1)', () => {
+      const p = new Player(GONDI_STATS);
+      expect(p.getEffectiveMaxSpeed()).toBeCloseTo(1.2);
+      p.addSnot();
+      expect(p.getEffectiveMaxSpeed()).toBeCloseTo(0.6);
+      p.addSnot();
+      expect(p.getEffectiveMaxSpeed()).toBeCloseTo(0.4);
+      p.addSnot();
+      expect(p.getEffectiveMaxSpeed()).toBeCloseTo(0.3);
+    });
+
+    it('getEffectiveRotSpeed returns base / (floor(snotCount/3) + 1)', () => {
+      const p = new Player(GONDI_STATS);
+      expect(p.getEffectiveRotSpeed()).toBeCloseTo(0.5);
+      p.addSnot();
+      expect(p.getEffectiveRotSpeed()).toBeCloseTo(0.5);
+      p.addSnot();
+      expect(p.getEffectiveRotSpeed()).toBeCloseTo(0.5);
+      p.addSnot();
+      expect(p.getEffectiveRotSpeed()).toBeCloseTo(0.25);
+    });
+
+    it('thrust uses effective max speed', () => {
+      const p = new Player(GONDI_STATS);
+      p.angle = 0;
+      p.addSnot();
+      for (let i = 0; i < 100; i++) p.thrust(100);
+      expect(p.accelVec.y).toBeCloseTo(0.6, 1);
+    });
+
+    it('rotation uses effective rotation speed', () => {
+      const p = new Player(GONDI_STATS);
+      p.snotCount = 3;
+      p.rotate(1, 100);
+      expect(p.angle).toBeCloseTo(8.75);
+    });
+  });
+
   describe('collision setup', () => {
     it('has entityType Player', () => {
       const p = new Player(GONDI_STATS);
@@ -241,6 +302,75 @@ describe('Player', () => {
       expect(p.collisionSpheres).toHaveLength(1);
       expect(p.collisionSpheres[0].offset).toEqual({ x: 0, y: 0, z: 0 });
       expect(p.collisionSpheres[0].radius).toBe(14);
+    });
+  });
+
+  describe('fireSecondary', () => {
+    it('creates a snot when fired', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      const snot = p.fireSecondary(enemy);
+      expect(snot).not.toBeNull();
+      expect(snot).toBeInstanceOf(Snot);
+    });
+
+    it('deducts energy on fire', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      p.fireSecondary(enemy);
+      expect(p.energy).toBeCloseTo(1 - 0.12);
+    });
+
+    it('sets secondary cooldown on fire', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      p.fireSecondary(enemy);
+      expect(p.secondaryCooldown).toBe(200);
+    });
+
+    it('returns null when secondary cooldown is active', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      p.secondaryCooldown = 50;
+      expect(p.fireSecondary(enemy)).toBeNull();
+    });
+
+    it('returns null when energy is too low', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      p.energy = 0.12;
+      expect(p.fireSecondary(enemy)).toBeNull();
+    });
+
+    it('spawns snot 25 units ahead', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      p.position = { x: 100, y: 200, z: 0 };
+      p.angle = 0;
+      const snot = p.fireSecondary(enemy)!;
+      expect(snot.position.x).toBeCloseTo(100);
+      expect(snot.position.y).toBeCloseTo(225);
+    });
+
+    it('sets snot target to enemy', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      const snot = p.fireSecondary(enemy)!;
+      expect(snot.target).toBe(enemy);
+    });
+
+    it('sets snot origin to self', () => {
+      const p = new Player(GONDI_STATS);
+      const enemy = new Player(GONDI_STATS);
+      const snot = p.fireSecondary(enemy)!;
+      expect(snot.originEntity).toBe(p);
+    });
+
+    it('decrements secondary cooldown in updateEnergy', () => {
+      const p = new Player(GONDI_STATS);
+      p.secondaryCooldown = 100;
+      p.updateEnergy(60);
+      expect(p.secondaryCooldown).toBe(40);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from './Bullet';
+import { Snot, SNOT_CONFIG } from './Snot';
 import { ARENA } from './Arena';
 
 export interface CharacterStats {
@@ -30,6 +31,8 @@ export class Player extends Entity {
   rollAngle: number = 0;
   energy: number = 1;
   primaryCooldown: number = 0;
+  snotCount: number = 0;
+  secondaryCooldown: number = 0;
   private needRollReset: boolean = false;
 
   constructor(stats: CharacterStats) {
@@ -40,7 +43,7 @@ export class Player extends Entity {
   }
 
   rotate(direction: 1 | -1, dt: number): void {
-    const rotSpeed = this.stats.rotationSpeed;
+    const rotSpeed = this.getEffectiveRotSpeed();
     const delta = rotSpeed * (dt * ARENA.TIME_SCALER);
 
     this.angle += direction * delta;
@@ -59,7 +62,7 @@ export class Player extends Entity {
       return;
     }
 
-    const rotSpeed = this.stats.rotationSpeed;
+    const rotSpeed = this.getEffectiveRotSpeed();
     const delta = ROLL_SCALER * rotSpeed * (dt * ARENA.TIME_SCALER);
 
     if (this.rollAngle < 0) {
@@ -79,7 +82,7 @@ export class Player extends Entity {
 
   thrust(dt: number): void {
     const accelAdd = this.stats.acceleration * (dt * ARENA.TIME_SCALER);
-    const fullSpeed = this.getFullSpeedVec(this.stats.speedMaxScaler);
+    const fullSpeed = this.getFullSpeedVec(this.getEffectiveMaxSpeed());
 
     // Move accelVec toward fullSpeed without overshooting
     this.accelVec.x = this.moveToward(this.accelVec.x, fullSpeed.x, accelAdd);
@@ -111,13 +114,56 @@ export class Player extends Entity {
     return bullet;
   }
 
+  fireSecondary(enemy: Player): Snot | null {
+    if (this.secondaryCooldown > 0) return null;
+    if (this.energy <= this.stats.primaryEnergyCost) return null;
+
+    this.energy -= this.stats.primaryEnergyCost;
+    this.secondaryCooldown = ARENA.SECONDARY_WEAPON_DELAY;
+
+    const snot = new Snot(this, enemy);
+    snot.angle = this.angle;
+
+    const spawnVec = this.getFullSpeedVec(25);
+    snot.position = {
+      x: this.position.x + spawnVec.x,
+      y: this.position.y + spawnVec.y,
+      z: this.position.z,
+    };
+
+    const speedVec = this.getFullSpeedVec(SNOT_CONFIG.speedMaxScaler);
+    snot.accelVec = { ...speedVec };
+
+    return snot;
+  }
+
   updateEnergy(dt: number): void {
     if (this.primaryCooldown > 0) {
       this.primaryCooldown -= dt;
       if (this.primaryCooldown < 0) this.primaryCooldown = 0;
     }
+    if (this.secondaryCooldown > 0) {
+      this.secondaryCooldown -= dt;
+      if (this.secondaryCooldown < 0) this.secondaryCooldown = 0;
+    }
     this.energy += this.stats.primaryWeaponFillRate * dt;
     if (this.energy > 1) this.energy = 1;
+  }
+
+  addSnot(): void {
+    this.snotCount += 1;
+  }
+
+  removeSnot(): void {
+    this.snotCount -= 1;
+  }
+
+  getEffectiveMaxSpeed(): number {
+    return this.stats.speedMaxScaler / (this.snotCount + 1);
+  }
+
+  getEffectiveRotSpeed(): number {
+    return this.stats.rotationSpeed / (Math.floor(this.snotCount / 3) + 1);
   }
 
   private moveToward(current: number, target: number, maxDelta: number): number {
