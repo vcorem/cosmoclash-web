@@ -1,7 +1,8 @@
 import { Entity, EntityType, CollisionSphere, Vec3 } from './Entity';
 import { Bullet } from '@/game/Bullet';
+import { Snot } from '@/game/Snot';
 import { GameEventMgr } from './GameEventMgr';
-import { CollisionEvent, BulletHitEvent, SunCollisionEvent } from './GameEvent';
+import { CollisionEvent, BulletHitEvent, SunCollisionEvent, SnotHitEvent } from './GameEvent';
 
 export interface SweepResult {
   hit: boolean;
@@ -100,11 +101,25 @@ export class CollisionDetector {
   private shouldCheck(a: Entity, b: Entity): boolean {
     const aIsBullet = a.entityType === EntityType.Bullet;
     const bIsBullet = b.entityType === EntityType.Bullet;
+    const aIsSnot = a.entityType === EntityType.Snot;
+    const bIsSnot = b.entityType === EntityType.Snot;
 
+    // Bullets don't collide with bullets
     if (aIsBullet && bIsBullet) return false;
 
+    // Snots don't collide with snots or bullets
+    if (aIsSnot && (bIsSnot || bIsBullet)) return false;
+    if (bIsSnot && (aIsSnot || aIsBullet)) return false;
+
+    // Attached snots skip collision entirely
+    if (aIsSnot && (a as Snot).attached) return false;
+    if (bIsSnot && (b as Snot).attached) return false;
+
+    // Projectiles don't collide with their origin
     if (aIsBullet && (a as Bullet).originEntity === b) return false;
     if (bIsBullet && (b as Bullet).originEntity === a) return false;
+    if (aIsSnot && (a as Snot).originEntity === b) return false;
+    if (bIsSnot && (b as Snot).originEntity === a) return false;
 
     return true;
   }
@@ -135,12 +150,18 @@ export class CollisionDetector {
   }
 
   private emitEvent(mgr: GameEventMgr, a: Entity, b: Entity, u0: number): void {
+    const aIsSnot = a.entityType === EntityType.Snot;
+    const bIsSnot = b.entityType === EntityType.Snot;
     const aIsBullet = a.entityType === EntityType.Bullet;
     const bIsBullet = b.entityType === EntityType.Bullet;
     const aIsSun = a.entityType === EntityType.Sun;
     const bIsSun = b.entityType === EntityType.Sun;
 
-    if (aIsBullet) {
+    if (aIsSnot) {
+      mgr.sendEvent(new SnotHitEvent(a, b));
+    } else if (bIsSnot) {
+      mgr.sendEvent(new SnotHitEvent(b, a));
+    } else if (aIsBullet) {
       mgr.sendEvent(new BulletHitEvent(a, b));
     } else if (bIsBullet) {
       mgr.sendEvent(new BulletHitEvent(b, a));

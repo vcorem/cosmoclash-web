@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
-import { BulletHitEvent, CollisionEvent, SunCollisionEvent } from '@/engine/GameEvent';
+import { Snot } from './Snot';
+import { Player, GONDI_STATS } from './Player';
+import { BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent } from '@/engine/GameEvent';
 
 describe('CollisionHandler', () => {
   let handler: CollisionHandler;
@@ -240,6 +242,57 @@ describe('CollisionHandler', () => {
       // P1's velocity should still point away from P2 (leftward)
       expect(p1.accelVec.x).toBeLessThan(0);
       // No oscillation — direction consistent
+    });
+  });
+
+  describe('snot hit', () => {
+    it('attaches snot to target player', () => {
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      const snot = new Snot(origin, target);
+
+      const evt = new SnotHitEvent(snot, target);
+      handler.onGameEvent(evt);
+
+      expect(snot.attached).toBe(true);
+      expect(snot.victim).toBe(target);
+    });
+
+    it('increments target snotCount', () => {
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      const snot = new Snot(origin, target);
+
+      const evt = new SnotHitEvent(snot, target);
+      handler.onGameEvent(evt);
+
+      expect(target.snotCount).toBe(1);
+    });
+
+    it('destroys snot when target is not a player', () => {
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      const snot = new Snot(origin, target);
+
+      const sun = new Entity();
+      sun.entityType = EntityType.Sun;
+
+      const evt = new SnotHitEvent(snot, sun);
+      handler.onGameEvent(evt);
+
+      expect(snot.alive).toBe(false);
+      expect(snot.attached).toBe(false);
+    });
+
+    it('keeps snot alive when attaching to player', () => {
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      const snot = new Snot(origin, target);
+
+      const evt = new SnotHitEvent(snot, target);
+      handler.onGameEvent(evt);
+
+      expect(snot.alive).toBe(true);
     });
   });
 

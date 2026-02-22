@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { sphereSphereSweep, CollisionDetector } from './CollisionDetector';
 import { Entity, EntityType } from './Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from '@/game/Bullet';
+import { Snot } from '@/game/Snot';
+import { Player, GONDI_STATS } from '@/game/Player';
 import { GameEventMgr } from './GameEventMgr';
-import { GameEventType, GameEvent, CollisionEvent, BulletHitEvent, SunCollisionEvent } from './GameEvent';
+import { GameEventType, GameEvent, CollisionEvent, BulletHitEvent, SunCollisionEvent, SnotHitEvent } from './GameEvent';
 
 describe('sphereSphereSweep', () => {
   it('detects head-on collision between two moving spheres', () => {
@@ -292,5 +294,104 @@ describe('CollisionDetector', () => {
     const hit = bulletEvents[0] as BulletHitEvent;
     expect(hit.bullet).toBe(bullet);
     expect(hit.target).toBe(sun);
+  });
+
+  describe('snot collision', () => {
+    it('emits SnotHitEvent when snot hits a player', () => {
+      const events: GameEvent[] = [];
+      const listener = { onGameEvent: (e: GameEvent) => events.push(e) };
+      GameEventMgr.getInstance().addListener(listener, GameEventType.SnotHit);
+
+      const origin = new Player(GONDI_STATS);
+      origin.position = { x: -100, y: 0, z: 0 };
+      origin.previousPosition = { x: -100, y: 0, z: 0 };
+
+      const target = new Player(GONDI_STATS);
+      target.position = { x: 5, y: 0, z: 0 };
+      target.previousPosition = { x: 5, y: 0, z: 0 };
+
+      const snot = new Snot(origin, target);
+      snot.position = { x: 4, y: 0, z: 0 };
+      snot.previousPosition = { x: 3, y: 0, z: 0 };
+
+      const detector = new CollisionDetector();
+      detector.checkCollisions([snot, target]);
+
+      expect(events.length).toBe(1);
+      expect(events[0].type).toBe(GameEventType.SnotHit);
+
+      GameEventMgr.getInstance().removeListener(listener, GameEventType.SnotHit);
+    });
+
+    it('does not collide snot with its origin player', () => {
+      const events: GameEvent[] = [];
+      const listener = { onGameEvent: (e: GameEvent) => events.push(e) };
+      GameEventMgr.getInstance().addListener(listener, GameEventType.SnotHit);
+
+      const origin = new Player(GONDI_STATS);
+      origin.position = { x: 0, y: 0, z: 0 };
+      origin.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const target = new Player(GONDI_STATS);
+      target.position = { x: 200, y: 0, z: 0 };
+
+      const snot = new Snot(origin, target);
+      snot.position = { x: 0, y: 0, z: 0 };
+      snot.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const detector = new CollisionDetector();
+      detector.checkCollisions([snot, origin]);
+
+      expect(events.length).toBe(0);
+
+      GameEventMgr.getInstance().removeListener(listener, GameEventType.SnotHit);
+    });
+
+    it('skips attached snots in collision detection', () => {
+      const events: GameEvent[] = [];
+      const listener = { onGameEvent: (e: GameEvent) => events.push(e) };
+      GameEventMgr.getInstance().addListener(listener, GameEventType.SnotHit);
+
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      target.position = { x: 5, y: 0, z: 0 };
+      target.previousPosition = { x: 5, y: 0, z: 0 };
+
+      const snot = new Snot(origin, target);
+      snot.attached = true;
+      snot.position = { x: 5, y: 0, z: 0 };
+      snot.previousPosition = { x: 5, y: 0, z: 0 };
+
+      const detector = new CollisionDetector();
+      detector.checkCollisions([snot, target]);
+
+      expect(events.length).toBe(0);
+
+      GameEventMgr.getInstance().removeListener(listener, GameEventType.SnotHit);
+    });
+
+    it('does not collide snot with another snot', () => {
+      const events: GameEvent[] = [];
+      const listener = { onGameEvent: (e: GameEvent) => events.push(e) };
+      GameEventMgr.getInstance().addListener(listener, GameEventType.SnotHit);
+
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+
+      const s1 = new Snot(origin, target);
+      s1.position = { x: 0, y: 0, z: 0 };
+      s1.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const s2 = new Snot(origin, target);
+      s2.position = { x: 0, y: 0, z: 0 };
+      s2.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const detector = new CollisionDetector();
+      detector.checkCollisions([s1, s2]);
+
+      expect(events.length).toBe(0);
+
+      GameEventMgr.getInstance().removeListener(listener, GameEventType.SnotHit);
+    });
   });
 });

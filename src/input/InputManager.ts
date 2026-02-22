@@ -3,6 +3,7 @@ export interface PlayerInput {
   rotateLeft: boolean;
   rotateRight: boolean;
   firePrimary: boolean;
+  fireSecondary: boolean;
 }
 
 interface PlayerKeyBindings {
@@ -10,22 +11,25 @@ interface PlayerKeyBindings {
   rotateLeft: string[];
   rotateRight: string[];
   firePrimary: string[];
+  fireSecondary: string[];
 }
 
 const DEFAULT_BINDINGS: PlayerKeyBindings[] = [
-  // Player 1: Arrow keys + /
+  // Player 1: Arrow keys + / + .
   {
     thrust: ['ArrowUp'],
     rotateLeft: ['ArrowLeft'],
     rotateRight: ['ArrowRight'],
     firePrimary: ['/'],
+    fireSecondary: ['.'],
   },
-  // Player 2: WASD + Space
+  // Player 2: WASD + Space + Shift
   {
     thrust: ['w', 'W'],
     rotateLeft: ['a', 'A'],
     rotateRight: ['d', 'D'],
     firePrimary: [' '],
+    fireSecondary: ['Shift'],
   },
 ];
 
@@ -69,6 +73,7 @@ export class InputManager {
       rotateLeft: b.rotateLeft.some(k => this.pressed.has(k)),
       rotateRight: b.rotateRight.some(k => this.pressed.has(k)),
       firePrimary: b.firePrimary.some(k => this.pressed.has(k)),
+      fireSecondary: b.fireSecondary.some(k => this.pressed.has(k)),
     };
   }
 

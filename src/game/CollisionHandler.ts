@@ -1,8 +1,10 @@
 import { GameEventListener } from '@/engine/GameEventMgr';
-import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent, SunCollisionEvent } from '@/engine/GameEvent';
+import { GameEvent, GameEventType, BulletHitEvent, CollisionEvent, SunCollisionEvent, SnotHitEvent } from '@/engine/GameEvent';
 import { Entity, EntityType } from '@/engine/Entity';
 import { ARENA } from './Arena';
 import { Bullet } from './Bullet';
+import { Snot } from './Snot';
+import { Player } from './Player';
 
 const COLLISION_DAMAGE_SCALE = 0.2;
 
@@ -21,6 +23,8 @@ export class CollisionHandler implements GameEventListener {
       this.handleShipCollision(event as CollisionEvent);
     } else if (event.type === GameEventType.SunCollision) {
       this.handleSunCollision(event as SunCollisionEvent);
+    } else if (event.type === GameEventType.SnotHit) {
+      this.handleSnotHit(event as SnotHitEvent);
     }
   }
 
@@ -169,6 +173,18 @@ export class CollisionHandler implements GameEventListener {
     );
     const bounce = Math.max(speed, MIN_BOUNCE_SPEED);
     other.accelVec = { x: nx * bounce, y: ny * bounce, z: 0 };
+  }
+
+  private handleSnotHit(event: SnotHitEvent): void {
+    const snot = event.snot as Snot;
+    const target = event.target;
+
+    if (target.entityType === EntityType.Player) {
+      snot.attachTo(target as Player);
+      (target as Player).addSnot();
+    } else {
+      snot.destroy();
+    }
   }
 }
 

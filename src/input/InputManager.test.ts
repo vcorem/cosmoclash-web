@@ -53,6 +53,13 @@ describe('InputManager', () => {
       expect(input.player(0).firePrimary).toBe(false);
     });
 
+    it('detects P1 secondary fire on period key', () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '.' }));
+      const pi = input.player(0);
+      expect(pi.fireSecondary).toBe(true);
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: '.' }));
+    });
+
     it('does NOT respond to P2 keys', () => {
       press('w');
       press('a');
@@ -96,6 +103,13 @@ describe('InputManager', () => {
       expect(input.player(1).firePrimary).toBe(true);
       release(' ');
       expect(input.player(1).firePrimary).toBe(false);
+    });
+
+    it('detects P2 secondary fire on Shift key', () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
+      const pi = input.player(1);
+      expect(pi.fireSecondary).toBe(true);
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
     });
 
     it('does NOT respond to P1 keys', () => {
