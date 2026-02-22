@@ -14,6 +14,7 @@ export interface CollisionSphere {
 export enum EntityType {
   Player,
   Bullet,
+  Sun,
   Dummy,
 }
 
