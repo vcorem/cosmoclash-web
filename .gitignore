@@ -20,3 +20,6 @@ Thumbs.db
 # Temp/debug files
 tmp/
 *.tmp
+
+# Worktrees
+.worktrees/
