@@ -121,6 +121,20 @@ export class CollisionDetector {
     if (aIsSnot && (a as Snot).originEntity === b) return false;
     if (bIsSnot && (b as Snot).originEntity === a) return false;
 
+    const aIsAsteroid = a.entityType === EntityType.Asteroid;
+    const bIsAsteroid = b.entityType === EntityType.Asteroid;
+
+    // Asteroids don't collide with asteroids
+    if (aIsAsteroid && bIsAsteroid) return false;
+
+    // Asteroids don't collide with snots
+    if (aIsAsteroid && bIsSnot) return false;
+    if (bIsAsteroid && aIsSnot) return false;
+
+    // Asteroids don't collide with explosions
+    if (aIsAsteroid && b.entityType === EntityType.Explosion) return false;
+    if (bIsAsteroid && a.entityType === EntityType.Explosion) return false;
+
     return true;
   }
 

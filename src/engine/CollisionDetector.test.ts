@@ -3,6 +3,7 @@ import { sphereSphereSweep, CollisionDetector } from './CollisionDetector';
 import { Entity, EntityType } from './Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from '@/game/Bullet';
 import { Snot } from '@/game/Snot';
+import { Asteroid } from '@/game/Asteroid';
 import { Player, GONDI_STATS } from '@/game/Player';
 import { GameEventMgr } from './GameEventMgr';
 import { GameEventType, GameEvent, CollisionEvent, BulletHitEvent, SunCollisionEvent, SnotHitEvent } from './GameEvent';
@@ -392,6 +393,98 @@ describe('CollisionDetector', () => {
       expect(events.length).toBe(0);
 
       GameEventMgr.getInstance().removeListener(listener, GameEventType.SnotHit);
+    });
+  });
+
+  describe('asteroid collision rules', () => {
+    it('skips asteroid-asteroid collision', () => {
+      const a1 = new Asteroid(0);
+      a1.position = { x: 0, y: 0, z: 0 };
+      a1.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const a2 = new Asteroid(1);
+      a2.position = { x: 5, y: 0, z: 0 };
+      a2.previousPosition = { x: 5, y: 0, z: 0 };
+
+      const events: GameEvent[] = [];
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => events.push(e) },
+        GameEventType.Collision,
+      );
+
+      detector.checkCollisions([a1, a2]);
+      expect(events).toHaveLength(0);
+    });
+
+    it('skips asteroid-snot collision', () => {
+      const asteroid = new Asteroid(0);
+      asteroid.position = { x: 0, y: 0, z: 0 };
+      asteroid.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const origin = new Player(GONDI_STATS);
+      const target = new Player(GONDI_STATS);
+      const snot = new Snot(origin, target);
+      snot.position = { x: 0, y: 0, z: 0 };
+      snot.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const events: GameEvent[] = [];
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => events.push(e) },
+        GameEventType.SnotHit,
+      );
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => events.push(e) },
+        GameEventType.Collision,
+      );
+
+      detector.checkCollisions([asteroid, snot]);
+      expect(events).toHaveLength(0);
+    });
+
+    it('allows asteroid-bullet collision (emits BulletHitEvent)', () => {
+      const asteroid = new Asteroid(1);
+      asteroid.position = { x: 50, y: 0, z: 0 };
+      asteroid.previousPosition = { x: 50, y: 0, z: 0 };
+
+      const shooter = new Entity();
+      shooter.entityType = EntityType.Player;
+
+      const bullet = new Bullet(FLAME_BULLET_CONFIG, shooter);
+      bullet.position = { x: 50, y: 0, z: 0 };
+      bullet.previousPosition = { x: 40, y: 0, z: 0 };
+
+      const events: GameEvent[] = [];
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => events.push(e) },
+        GameEventType.BulletHit,
+      );
+
+      detector.checkCollisions([asteroid, bullet]);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toBeInstanceOf(BulletHitEvent);
+      const hit = events[0] as BulletHitEvent;
+      expect(hit.bullet).toBe(bullet);
+      expect(hit.target).toBe(asteroid);
+    });
+
+    it('allows asteroid-player collision (emits CollisionEvent)', () => {
+      const asteroid = new Asteroid(0);
+      asteroid.position = { x: 0, y: 0, z: 0 };
+      asteroid.previousPosition = { x: 0, y: 0, z: 0 };
+
+      const player = new Player(GONDI_STATS);
+      player.position = { x: 5, y: 0, z: 0 };
+      player.previousPosition = { x: 5, y: 0, z: 0 };
+
+      const events: GameEvent[] = [];
+      GameEventMgr.getInstance().addListener(
+        { onGameEvent: (e) => events.push(e) },
+        GameEventType.Collision,
+      );
+
+      detector.checkCollisions([asteroid, player]);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toBeInstanceOf(CollisionEvent);
     });
   });
 });
