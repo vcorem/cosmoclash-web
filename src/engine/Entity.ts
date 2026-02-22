@@ -18,6 +18,7 @@ export enum EntityType {
   Dummy,
   Snot,
   Explosion,
+  Asteroid,
 }
 
 export class Entity {
