@@ -25,7 +25,7 @@ export function createStarField(): THREE.Points {
   for (let i = 0; i < ARENA.NUM_STARS; i++) {
     positions[i * 3] = (Math.random() - 0.5) * extent;
     positions[i * 3 + 1] = (Math.random() - 0.5) * extent;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * extent;
+    positions[i * 3 + 2] = 0; // flat plane — parent z handles depth
   }
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -68,6 +68,7 @@ export function createStarField(): THREE.Points {
 
   const stars = new THREE.Points(geometry, material);
   stars.position.z = ARENA.STARS_Z;
+  stars.renderOrder = -1; // render before all other transparent objects
   return stars;
 }
 

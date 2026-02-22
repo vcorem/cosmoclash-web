@@ -124,6 +124,29 @@ sunMesh.rotation.x = -90 * rad;
 sunMesh.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
 scene.add(sunMesh);
 
+// Sun glow — large additive billboard behind the sphere
+const glowCanvas = document.createElement('canvas');
+glowCanvas.width = 128;
+glowCanvas.height = 128;
+const glowCtx = glowCanvas.getContext('2d')!;
+const gradient = glowCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+gradient.addColorStop(0, 'rgba(255, 80, 0, 0.6)');
+gradient.addColorStop(0.4, 'rgba(255, 30, 0, 0.2)');
+gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+glowCtx.fillStyle = gradient;
+glowCtx.fillRect(0, 0, 128, 128);
+const glowTexture = new THREE.CanvasTexture(glowCanvas);
+const glowMat = new THREE.SpriteMaterial({
+  map: glowTexture,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+});
+const sunGlow = new THREE.Sprite(glowMat);
+sunGlow.scale.set(300, 300, 1);
+sunGlow.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
+scene.add(sunGlow);
+
 // Sun point light
 const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
 sunLight.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
