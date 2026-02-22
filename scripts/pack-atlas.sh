@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SRC="../turtle_svn/trunk/Turtle/mediaflat/explosion1"
-OUT="public/textures/explosion_atlas.jpg"
+OUT="public/textures/explosion_atlas.png"
 COLS=9
 
 # Collect frames in order (0000 through 0080 = 81 frames)
@@ -22,5 +22,9 @@ done
 
 mkdir -p "$(dirname "$OUT")"
 
-montage $FILES -tile ${COLS}x -geometry +0+0 -background black "$OUT"
+# Pack into atlas, then add alpha from luminance so dark background is transparent
+TEMP_JPG="${OUT%.png}.tmp.jpg"
+montage $FILES -tile ${COLS}x -geometry +0+0 -background black "$TEMP_JPG"
+magick "$TEMP_JPG" \( +clone -colorspace gray \) -alpha off -compose CopyOpacity -composite "$OUT"
+rm -f "$TEMP_JPG"
 echo "Created $OUT ($(du -h "$OUT" | cut -f1) )"

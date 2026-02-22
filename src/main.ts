@@ -220,7 +220,7 @@ function acquireSnot(origin: Entity, target: Player): Snot {
 const EXPL_ATLAS_COLS = ARENA.EXPLOSION_ATLAS_COLS;
 const EXPL_ATLAS_ROWS = ARENA.EXPLOSION_ATLAS_ROWS;
 
-const explosionTexture = new THREE.TextureLoader().load('/textures/explosion_atlas.jpg');
+const explosionTexture = new THREE.TextureLoader().load('/textures/explosion_atlas.png');
 explosionTexture.repeat.set(1 / EXPL_ATLAS_COLS, 1 / EXPL_ATLAS_ROWS);
 explosionTexture.wrapS = THREE.RepeatWrapping;
 explosionTexture.wrapT = THREE.RepeatWrapping;
@@ -295,6 +295,16 @@ const boundaryGeo = new THREE.EdgesGeometry(
 const boundaryMat = new THREE.LineBasicMaterial({ color: 0x333333 });
 const boundary = new THREE.LineSegments(boundaryGeo, boundaryMat);
 scene.add(boundary);
+
+// Debug: press 1/2 to instantly kill player 1/2 with explosion
+window.addEventListener('keydown', (e) => {
+  const target = e.key === '1' ? player1 : e.key === '2' ? player2 : null;
+  if (target && target.alive) {
+    target.health = 0;
+    target.destroy();
+    GameEventMgr.getInstance().sendEvent(new ExplosionEvent(target));
+  }
+});
 
 // Per-player update helper
 function updatePlayerInput(
