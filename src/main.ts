@@ -15,6 +15,7 @@ import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, CameraController } from '@/game/Camera';
 import { Sun } from '@/game/Sun';
 import { applySunGravity } from '@/game/Gravity';
+import { Snot } from '@/game/Snot';
 
 // Setup Three.js
 const scene = createScene();
@@ -147,6 +148,17 @@ sunGlow.scale.set(300, 300, 1);
 sunGlow.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
 scene.add(sunGlow);
 
+// Snot sprites — animated billboard with sprite sheet atlas
+const SNOT_ATLAS_COLS = ARENA.SNOT_ATLAS_COLS;
+const SNOT_ATLAS_ROWS = ARENA.SNOT_ATLAS_ROWS;
+
+const snotTexture = new THREE.TextureLoader().load('/textures/snot_atlas.jpg');
+snotTexture.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
+snotTexture.wrapS = THREE.RepeatWrapping;
+snotTexture.wrapT = THREE.RepeatWrapping;
+
+const snotSprites = new Map<Snot, { sprite: THREE.Sprite; texture: THREE.Texture }>();
+
 // Sun point light
 const sunLight = new THREE.PointLight(0xff0000, 2, 1500);
 sunLight.position.set(ARENA.SUN_POSITION.x, ARENA.SUN_POSITION.y, ARENA.SUN_POSITION.z);
@@ -166,6 +178,7 @@ const collisionHandler = new CollisionHandler();
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.BulletHit);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SunCollision);
+GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SnotHit);
 
 // Dev helper: faint arena boundary
 const boundaryGeo = new THREE.EdgesGeometry(
@@ -178,6 +191,7 @@ scene.add(boundary);
 // Per-player update helper
 function updatePlayerInput(
   player: Player,
+  enemy: Player,
   pi: PlayerInput,
   thrustEffect: ThrustEffect,
   dt: number,
@@ -217,6 +231,26 @@ function updatePlayerInput(
       bulletSprites.set(bullet, sprite);
     }
   }
+
+  if (pi.fireSecondary) {
+    const snot = player.fireSecondary(enemy);
+    if (snot) {
+      entityManager.add(snot);
+      const mat = new THREE.SpriteMaterial({
+        map: snotTexture.clone(),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true,
+      });
+      mat.map!.repeat.set(1 / SNOT_ATLAS_COLS, 1 / SNOT_ATLAS_ROWS);
+      mat.map!.wrapS = THREE.RepeatWrapping;
+      mat.map!.wrapT = THREE.RepeatWrapping;
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(ARENA.SNOT_BILLBOARD_SIZE, ARENA.SNOT_BILLBOARD_SIZE, 1);
+      scene.add(sprite);
+      snotSprites.set(snot, { sprite, texture: mat.map! });
+    }
+  }
 }
 
 // Sync mesh to player physics state
@@ -239,8 +273,8 @@ const gameLoop = new GameLoop(
     enforceMinimumDistance(player1, player2);
 
     // Process input for both players
-    updatePlayerInput(player1, input.player(0), thrustEffect1, dt);
-    updatePlayerInput(player2, input.player(1), thrustEffect2, dt);
+    updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
+    updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
 
     // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
@@ -249,6 +283,13 @@ const gameLoop = new GameLoop(
     // Sun gravity — applied to players only (matches original C++)
     applySunGravity(player1, ARENA.SUN_POSITION, dt);
     applySunGravity(player2, ARENA.SUN_POSITION, dt);
+
+    // Sun gravity on snots in flight
+    for (const [snot] of snotSprites) {
+      if (!snot.attached) {
+        applySunGravity(snot, ARENA.SUN_POSITION, dt);
+      }
+    }
 
     // Sun animation
     sun.updateAnimation(dt);
@@ -277,6 +318,23 @@ const gameLoop = new GameLoop(
         bulletSprites.delete(bullet);
       } else {
         sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
+      }
+    }
+
+    // Sync snot sprites: update position and animation frame
+    for (const [snot, { sprite, texture }] of snotSprites) {
+      if (!snot.alive) {
+        scene.remove(sprite);
+        (sprite.material as THREE.SpriteMaterial).dispose();
+        texture.dispose();
+        snotSprites.delete(snot);
+      } else {
+        sprite.position.set(snot.position.x, snot.position.y, snot.position.z);
+        // Update atlas frame
+        const frameIndex = Math.floor(snot.currentFrame);
+        const col = frameIndex % SNOT_ATLAS_COLS;
+        const row = Math.floor(frameIndex / SNOT_ATLAS_COLS);
+        texture.offset.set(col / SNOT_ATLAS_COLS, 1 - (row + 1) / SNOT_ATLAS_ROWS);
       }
     }
 
