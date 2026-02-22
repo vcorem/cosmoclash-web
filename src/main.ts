@@ -142,7 +142,7 @@ const gameLoop = new GameLoop(
       // Roll: rotate around the ship's actual forward axis for clean banking
       const headingQ = _qHead.setFromAxisAngle(_zAxis, player.angle * rad);
       const forward = _fwd.set(0, 1, 0).applyQuaternion(headingQ);
-      const rollQ = _qRoll.setFromAxisAngle(forward, -player.rollAngle * rad);
+      const rollQ = _qRoll.setFromAxisAngle(forward, player.rollAngle * rad);
       playerMesh.quaternion.copy(rollQ.multiply(headingQ));
     }
 
