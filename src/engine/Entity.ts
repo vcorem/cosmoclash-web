@@ -6,6 +6,17 @@ export interface Vec3 {
   z: number;
 }
 
+export interface CollisionSphere {
+  offset: Vec3;
+  radius: number;
+}
+
+export enum EntityType {
+  Player,
+  Bullet,
+  Dummy,
+}
+
 export class Entity {
   position: Vec3 = { x: 0, y: 0, z: 0 };
   previousPosition: Vec3 = { x: 0, y: 0, z: 0 };
@@ -13,6 +24,9 @@ export class Entity {
   angle: number = 0;
   alive: boolean = true;
   autoWrap: boolean = true;
+  health: number = 1;
+  entityType: EntityType = EntityType.Player;
+  collisionSpheres: CollisionSphere[] = [];
 
   update(dt: number): void {
     this.previousPosition = { ...this.position };

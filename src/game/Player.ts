@@ -1,4 +1,4 @@
-import { Entity } from '@/engine/Entity';
+import { Entity, EntityType } from '@/engine/Entity';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from './Bullet';
 import { ARENA } from './Arena';
 
@@ -35,6 +35,8 @@ export class Player extends Entity {
   constructor(stats: CharacterStats) {
     super();
     this.stats = stats;
+    this.entityType = EntityType.Player;
+    this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
   }
 
   rotate(direction: 1 | -1, dt: number): void {

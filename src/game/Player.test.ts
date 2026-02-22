@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Player, GONDI_STATS } from './Player';
 import { FLAME_BULLET_CONFIG } from './Bullet';
+import { EntityType } from '@/engine/Entity';
 
 describe('Player', () => {
   describe('Gondi stats', () => {
@@ -226,6 +227,20 @@ describe('Player', () => {
       p.angle = 0;
       const vec = p.getFullSpeedVec(GONDI_STATS.speedMaxScaler);
       expect(vec.y).toBeCloseTo(1.2);
+    });
+  });
+
+  describe('collision setup', () => {
+    it('has entityType Player', () => {
+      const p = new Player(GONDI_STATS);
+      expect(p.entityType).toBe(EntityType.Player);
+    });
+
+    it('has one collision sphere at origin with radius 14', () => {
+      const p = new Player(GONDI_STATS);
+      expect(p.collisionSpheres).toHaveLength(1);
+      expect(p.collisionSpheres[0].offset).toEqual({ x: 0, y: 0, z: 0 });
+      expect(p.collisionSpheres[0].radius).toBe(14);
     });
   });
 });

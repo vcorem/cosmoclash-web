@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
-import { Entity } from '@/engine/Entity';
+import { Entity, EntityType } from '@/engine/Entity';
 
 describe('Bullet', () => {
   describe('FLAME_BULLET_CONFIG', () => {
@@ -62,6 +62,20 @@ describe('Bullet', () => {
       b.update(699);
       expect(b.ttl).toBe(1);
       expect(b.alive).toBe(true);
+    });
+  });
+
+  describe('collision setup', () => {
+    it('has entityType Bullet', () => {
+      const b = new Bullet(FLAME_BULLET_CONFIG);
+      expect(b.entityType).toBe(EntityType.Bullet);
+    });
+
+    it('has one collision sphere at origin with radius from config', () => {
+      const b = new Bullet(FLAME_BULLET_CONFIG);
+      expect(b.collisionSpheres).toHaveLength(1);
+      expect(b.collisionSpheres[0].offset).toEqual({ x: 0, y: 0, z: 0 });
+      expect(b.collisionSpheres[0].radius).toBe(10);
     });
   });
 });

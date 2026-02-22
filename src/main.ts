@@ -7,6 +7,11 @@ import { ARENA } from '@/game/Arena';
 import { Bullet } from '@/game/Bullet';
 import { InputManager } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
+import { CollisionDetector } from '@/engine/CollisionDetector';
+import { CollisionHandler } from '@/game/CollisionHandler';
+import { GameEventMgr } from '@/engine/GameEventMgr';
+import { GameEventType } from '@/engine/GameEvent';
+import { EntityType } from '@/engine/Entity';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, updateCamera } from '@/game/Camera';
 
@@ -66,6 +71,35 @@ loader.load(
   }
 );
 
+let dummyMesh: THREE.Object3D | null = null;
+
+loader.load(
+  '/models/gondi.glb',
+  (gltf) => {
+    const container = new THREE.Group();
+    const model = gltf.scene;
+    model.scale.set(1.8, 1.8, 1.8);
+    model.rotation.set(0, 270 * rad, 90 * rad);
+    container.add(model);
+    scene.add(container);
+    dummyMesh = container;
+    dummyMesh.position.set(dummy.position.x, dummy.position.y, 0);
+  },
+  undefined,
+  () => {
+    console.warn('Could not load gondi.glb for dummy, using placeholder');
+    const container = new THREE.Group();
+    const geo = new THREE.ConeGeometry(8, 20, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xff4444 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.set(0, 270 * rad, 90 * rad);
+    container.add(mesh);
+    scene.add(container);
+    dummyMesh = container;
+    dummyMesh.position.set(dummy.position.x, dummy.position.y, 0);
+  }
+);
+
 // Load flame texture
 const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
 
@@ -81,6 +115,18 @@ scene.add(thrustEffect.points);
 const entityManager = new EntityManager();
 entityManager.add(player);
 const input = new InputManager();
+
+// Collision detection
+const collisionDetector = new CollisionDetector();
+const collisionHandler = new CollisionHandler();
+GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.BulletHit);
+GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision);
+
+// Dummy target for collision testing
+const dummy = new Player(GONDI_STATS);
+dummy.entityType = EntityType.Dummy;
+dummy.position = { ...ARENA.PLAYER2_SPAWN };
+entityManager.add(dummy);
 
 // Dev helper: faint arena boundary
 const boundaryGeo = new THREE.EdgesGeometry(
@@ -132,6 +178,9 @@ const gameLoop = new GameLoop(
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     entityManager.update(dt, camCenter);
 
+    // Collision detection
+    collisionDetector.checkCollisions(entityManager.entities);
+
     // Update camera to follow player
     updateCamera(camera, player.position.x, player.position.y, dt);
 
@@ -154,6 +203,16 @@ const gameLoop = new GameLoop(
         bulletSprites.delete(bullet);
       } else {
         sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
+      }
+    }
+
+    // Sync dummy mesh
+    if (dummyMesh) {
+      if (!dummy.alive) {
+        scene.remove(dummyMesh);
+        dummyMesh = null;
+      } else {
+        dummyMesh.position.set(dummy.position.x, dummy.position.y, dummy.position.z);
       }
     }
     entityManager.removeDeadEntities();

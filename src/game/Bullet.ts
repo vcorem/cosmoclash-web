@@ -1,4 +1,4 @@
-import { Entity } from '@/engine/Entity';
+import { Entity, EntityType } from '@/engine/Entity';
 
 export interface BulletConfig {
   speedMaxScaler: number;
@@ -21,6 +21,8 @@ export class Bullet extends Entity {
 
   constructor(config: BulletConfig, originEntity: Entity | null = null) {
     super();
+    this.entityType = EntityType.Bullet;
+    this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: config.collisionRadius }];
     this.config = config;
     this.originEntity = originEntity;
     this.ttl = config.maxTtl;

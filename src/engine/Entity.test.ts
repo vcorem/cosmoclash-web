@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Entity } from './Entity';
+import { Entity, EntityType } from './Entity';
 
 describe('Entity', () => {
   describe('constructor', () => {
@@ -163,5 +163,39 @@ describe('Entity', () => {
       const vec = e.getFullSpeedVec(0.5);
       expect(vec.y).toBeCloseTo(0.5);
     });
+  });
+});
+
+describe('health', () => {
+  it('initializes with full health', () => {
+    const e = new Entity();
+    expect(e.health).toBe(1);
+  });
+
+  it('can take damage', () => {
+    const e = new Entity();
+    e.health -= 0.3;
+    expect(e.health).toBeCloseTo(0.7);
+  });
+
+  it('destroy sets alive to false', () => {
+    const e = new Entity();
+    e.health = 0;
+    e.destroy();
+    expect(e.alive).toBe(false);
+  });
+});
+
+describe('entityType', () => {
+  it('defaults to Player', () => {
+    const e = new Entity();
+    expect(e.entityType).toBe(EntityType.Player);
+  });
+});
+
+describe('collisionSpheres', () => {
+  it('initializes with empty collision spheres', () => {
+    const e = new Entity();
+    expect(e.collisionSpheres).toEqual([]);
   });
 });
