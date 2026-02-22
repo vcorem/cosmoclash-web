@@ -1,7 +1,8 @@
 const THRUST_KEYS = ['ArrowUp', 'w', 'W'];
 const ROTATE_LEFT_KEYS = ['ArrowLeft', 'a', 'A'];
 const ROTATE_RIGHT_KEYS = ['ArrowRight', 'd', 'D'];
-const GAME_KEYS = [...THRUST_KEYS, ...ROTATE_LEFT_KEYS, ...ROTATE_RIGHT_KEYS];
+const FIRE_PRIMARY_KEYS = [' '];
+const GAME_KEYS = [...THRUST_KEYS, ...ROTATE_LEFT_KEYS, ...ROTATE_RIGHT_KEYS, ...FIRE_PRIMARY_KEYS];
 
 export class InputManager {
   private pressed = new Set<string>();
@@ -38,6 +39,10 @@ export class InputManager {
 
   get rotateRight(): boolean {
     return ROTATE_RIGHT_KEYS.some(k => this.pressed.has(k));
+  }
+
+  get firePrimary(): boolean {
+    return FIRE_PRIMARY_KEYS.some(k => this.pressed.has(k));
   }
 
   destroy(): void {

@@ -4,6 +4,7 @@ import { GameLoop } from '@/engine/GameLoop';
 import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
 import { ARENA } from '@/game/Arena';
+import { Bullet } from '@/game/Bullet';
 import { InputManager } from '@/input/InputManager';
 import { createScene, createStarField, createRenderer } from '@/game/Scene';
 import { createCamera, updateCamera } from '@/game/Camera';
@@ -64,6 +65,12 @@ loader.load(
   }
 );
 
+// Load flame texture
+const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
+
+// Bullet sprite tracking
+const bulletSprites = new Map<Bullet, THREE.Sprite>();
+
 // Systems
 const entityManager = new EntityManager();
 entityManager.add(player);
@@ -93,6 +100,25 @@ const gameLoop = new GameLoop(
       player.thrust(dt);
     }
 
+    // Energy & weapons
+    player.updateEnergy(dt);
+
+    if (input.firePrimary) {
+      const bullet = player.firePrimary();
+      if (bullet) {
+        entityManager.add(bullet);
+        const mat = new THREE.SpriteMaterial({
+          map: flameTexture,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.scale.set(35, 35, 1);
+        scene.add(sprite);
+        bulletSprites.set(bullet, sprite);
+      }
+    }
+
     // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
     entityManager.update(dt, camCenter);
@@ -110,6 +136,18 @@ const gameLoop = new GameLoop(
       const rollQ = _qRoll.setFromAxisAngle(forward, -player.rollAngle * rad);
       playerMesh.quaternion.copy(rollQ.multiply(headingQ));
     }
+
+    // Sync bullet sprites and remove dead ones
+    for (const [bullet, sprite] of bulletSprites) {
+      if (!bullet.alive) {
+        scene.remove(sprite);
+        sprite.material.dispose();
+        bulletSprites.delete(bullet);
+      } else {
+        sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
+      }
+    }
+    entityManager.removeDeadEntities();
 
     // Parallax: stars scroll at 80% of camera speed for depth effect
     stars.position.set(camera.position.x * 0.8, camera.position.y * 0.8, ARENA.STARS_Z);

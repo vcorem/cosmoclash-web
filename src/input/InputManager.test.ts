@@ -56,6 +56,13 @@ describe('InputManager', () => {
     expect(input.rotateRight).toBe(true);
   });
 
+  it('reports firePrimary from Space', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    expect(input.firePrimary).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+    expect(input.firePrimary).toBe(false);
+  });
+
   it('cleans up listeners on destroy', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     input.destroy();
