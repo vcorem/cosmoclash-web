@@ -37,6 +37,7 @@ loader.load(
   '/models/gondi.glb',
   (gltf) => {
     const container = new THREE.Group();
+    container.rotation.order = 'ZXY'; // Match Irrlicht's rotation order
     const model = gltf.scene;
     model.scale.set(1.8, 1.8, 1.8);
     model.rotation.set(-90 * rad, 0, 0);
@@ -48,6 +49,7 @@ loader.load(
   () => {
     console.warn('Could not load gondi.glb, using placeholder');
     const container = new THREE.Group();
+    container.rotation.order = 'ZXY'; // Match Irrlicht's rotation order
     const geo = new THREE.ConeGeometry(8, 20, 8);
     const mat = new THREE.MeshLambertMaterial({ color: 0x00ff88 });
     const mesh = new THREE.Mesh(geo, mat);
