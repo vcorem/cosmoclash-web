@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { InputManager } from './InputManager';
 
+function press(key: string) {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+}
+
+function release(key: string) {
+  window.dispatchEvent(new KeyboardEvent('keyup', { key }));
+}
+
 describe('InputManager', () => {
   let input: InputManager;
 
@@ -12,63 +20,104 @@ describe('InputManager', () => {
     input.destroy();
   });
 
-  it('reports no keys pressed initially', () => {
-    expect(input.isPressed('ArrowUp')).toBe(false);
-    expect(input.isPressed('ArrowLeft')).toBe(false);
+  describe('Player 1 (Arrow keys + /)', () => {
+    it('reports no input initially', () => {
+      const p1 = input.player(0);
+      expect(p1.thrust).toBe(false);
+      expect(p1.rotateLeft).toBe(false);
+      expect(p1.rotateRight).toBe(false);
+      expect(p1.firePrimary).toBe(false);
+    });
+
+    it('detects ArrowUp as thrust', () => {
+      press('ArrowUp');
+      expect(input.player(0).thrust).toBe(true);
+      release('ArrowUp');
+      expect(input.player(0).thrust).toBe(false);
+    });
+
+    it('detects ArrowLeft as rotateLeft', () => {
+      press('ArrowLeft');
+      expect(input.player(0).rotateLeft).toBe(true);
+    });
+
+    it('detects ArrowRight as rotateRight', () => {
+      press('ArrowRight');
+      expect(input.player(0).rotateRight).toBe(true);
+    });
+
+    it('detects / as firePrimary', () => {
+      press('/');
+      expect(input.player(0).firePrimary).toBe(true);
+      release('/');
+      expect(input.player(0).firePrimary).toBe(false);
+    });
+
+    it('does NOT respond to P2 keys', () => {
+      press('w');
+      press('a');
+      press('d');
+      press(' ');
+      const p1 = input.player(0);
+      expect(p1.thrust).toBe(false);
+      expect(p1.rotateLeft).toBe(false);
+      expect(p1.rotateRight).toBe(false);
+      expect(p1.firePrimary).toBe(false);
+    });
   });
 
-  it('tracks keydown events', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    expect(input.isPressed('ArrowUp')).toBe(true);
+  describe('Player 2 (WASD + Space)', () => {
+    it('detects w as thrust (case insensitive)', () => {
+      press('w');
+      expect(input.player(1).thrust).toBe(true);
+      release('w');
+      press('W');
+      expect(input.player(1).thrust).toBe(true);
+    });
+
+    it('detects a as rotateLeft (case insensitive)', () => {
+      press('a');
+      expect(input.player(1).rotateLeft).toBe(true);
+      release('a');
+      press('A');
+      expect(input.player(1).rotateLeft).toBe(true);
+    });
+
+    it('detects d as rotateRight (case insensitive)', () => {
+      press('d');
+      expect(input.player(1).rotateRight).toBe(true);
+      release('d');
+      press('D');
+      expect(input.player(1).rotateRight).toBe(true);
+    });
+
+    it('detects Space as firePrimary', () => {
+      press(' ');
+      expect(input.player(1).firePrimary).toBe(true);
+      release(' ');
+      expect(input.player(1).firePrimary).toBe(false);
+    });
+
+    it('does NOT respond to P1 keys', () => {
+      press('ArrowUp');
+      press('ArrowLeft');
+      press('ArrowRight');
+      press('/');
+      const p2 = input.player(1);
+      expect(p2.thrust).toBe(false);
+      expect(p2.rotateLeft).toBe(false);
+      expect(p2.rotateRight).toBe(false);
+      expect(p2.firePrimary).toBe(false);
+    });
   });
 
-  it('tracks keyup events', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowUp' }));
-    expect(input.isPressed('ArrowUp')).toBe(false);
-  });
-
-  it('reports thrust from ArrowUp or w', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }));
-    expect(input.thrust).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }));
-    expect(input.thrust).toBe(false);
-
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    expect(input.thrust).toBe(true);
-  });
-
-  it('reports rotateLeft from ArrowLeft or a', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
-    expect(input.rotateLeft).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'a' }));
-
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
-    expect(input.rotateLeft).toBe(true);
-  });
-
-  it('reports rotateRight from ArrowRight or d', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'd' }));
-    expect(input.rotateRight).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'd' }));
-
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-    expect(input.rotateRight).toBe(true);
-  });
-
-  it('reports firePrimary from Space', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
-    expect(input.firePrimary).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
-    expect(input.firePrimary).toBe(false);
-  });
-
-  it('cleans up listeners on destroy', () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    input.destroy();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
-    // After destroy, state should be frozen at last known state
-    // but no new events processed — we just check it doesn't throw
-    expect(input.isPressed('ArrowLeft')).toBe(false);
+  describe('destroy', () => {
+    it('stops tracking keys after destroy', () => {
+      press('ArrowUp');
+      input.destroy();
+      press('ArrowLeft');
+      expect(input.player(0).thrust).toBe(false);
+      expect(input.player(0).rotateLeft).toBe(false);
+    });
   });
 });
