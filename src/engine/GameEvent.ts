@@ -4,6 +4,7 @@ export enum GameEventType {
   Collision,
   Explosion,
   BulletHit,
+  SunCollision,
   FrameRender,
 }
 
@@ -45,5 +46,16 @@ export class ExplosionEvent extends GameEvent {
   constructor(entity: Entity) {
     super(GameEventType.Explosion);
     this.entity = entity;
+  }
+}
+
+export class SunCollisionEvent extends GameEvent {
+  readonly sun: Entity;
+  readonly other: Entity;
+
+  constructor(sun: Entity, other: Entity) {
+    super(GameEventType.SunCollision);
+    this.sun = sun;
+    this.other = other;
   }
 }
