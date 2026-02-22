@@ -77,7 +77,7 @@ loader.load(
   '/models/gondi.glb',
   (gltf) => {
     const container = new THREE.Group();
-    const model = gltf.scene;
+    const model = gltf.scene.clone();
     model.scale.set(1.8, 1.8, 1.8);
     model.rotation.set(0, 270 * rad, 90 * rad);
     container.add(model);
@@ -125,7 +125,7 @@ GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision
 // Dummy target for collision testing
 const dummy = new Player(GONDI_STATS);
 dummy.entityType = EntityType.Dummy;
-dummy.position = { ...ARENA.PLAYER2_SPAWN };
+dummy.position = { x: ARENA.PLAYER1_SPAWN.x + 100, y: ARENA.PLAYER1_SPAWN.y, z: 0 };
 entityManager.add(dummy);
 
 // Dev helper: faint arena boundary
