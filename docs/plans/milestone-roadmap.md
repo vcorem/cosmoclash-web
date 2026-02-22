@@ -7,9 +7,9 @@
 | # | Milestone | Status | Dependencies |
 |---|-----------|--------|--------------|
 | 1 | Single Ship Flight | DONE | — |
-| 2 | Weapons & Energy | Planned | M1 |
-| 3 | Collision Detection | Planned | M2 |
-| 4 | Second Player & Camera | Planned | M3 |
+| 2 | Weapons & Energy | DONE | M1 |
+| 3 | Collision Detection | DONE | M2 |
+| 4 | Second Player & Camera | DONE | M3 |
 | 5 | Sun & Gravity | Planned | M3 |
 | 6 | Snot Mechanic | Planned | M3 |
 | 7 | Entity Pooling & Explosions | Planned | M3 |
