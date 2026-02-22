@@ -1,7 +1,7 @@
 import { Entity, EntityType, CollisionSphere, Vec3 } from './Entity';
 import { Bullet } from '@/game/Bullet';
 import { GameEventMgr } from './GameEventMgr';
-import { CollisionEvent, BulletHitEvent } from './GameEvent';
+import { CollisionEvent, BulletHitEvent, SunCollisionEvent } from './GameEvent';
 
 export interface SweepResult {
   hit: boolean;
@@ -137,11 +137,17 @@ export class CollisionDetector {
   private emitEvent(mgr: GameEventMgr, a: Entity, b: Entity, u0: number): void {
     const aIsBullet = a.entityType === EntityType.Bullet;
     const bIsBullet = b.entityType === EntityType.Bullet;
+    const aIsSun = a.entityType === EntityType.Sun;
+    const bIsSun = b.entityType === EntityType.Sun;
 
     if (aIsBullet) {
       mgr.sendEvent(new BulletHitEvent(a, b));
     } else if (bIsBullet) {
       mgr.sendEvent(new BulletHitEvent(b, a));
+    } else if (aIsSun) {
+      mgr.sendEvent(new SunCollisionEvent(a, b));
+    } else if (bIsSun) {
+      mgr.sendEvent(new SunCollisionEvent(b, a));
     } else {
       mgr.sendEvent(new CollisionEvent(a, b, u0));
     }

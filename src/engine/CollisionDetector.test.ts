@@ -3,7 +3,7 @@ import { sphereSphereSweep, CollisionDetector } from './CollisionDetector';
 import { Entity, EntityType } from './Entity';
 import { Bullet, FLAME_BULLET_CONFIG } from '@/game/Bullet';
 import { GameEventMgr } from './GameEventMgr';
-import { GameEventType, GameEvent, CollisionEvent, BulletHitEvent } from './GameEvent';
+import { GameEventType, GameEvent, CollisionEvent, BulletHitEvent, SunCollisionEvent } from './GameEvent';
 
 describe('sphereSphereSweep', () => {
   it('detects head-on collision between two moving spheres', () => {
@@ -230,5 +230,67 @@ describe('CollisionDetector', () => {
     detector.checkCollisions([p1, p2]);
 
     expect(events).toHaveLength(1);
+  });
+
+  it('fires SunCollisionEvent when player collides with sun', () => {
+    const sun = new Entity();
+    sun.entityType = EntityType.Sun;
+    sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+    sun.position = { x: 0, y: 0, z: 0 };
+    sun.previousPosition = { x: 0, y: 0, z: 0 };
+
+    const player = new Entity();
+    player.entityType = EntityType.Player;
+    player.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
+    player.position = { x: 50, y: 0, z: 0 };
+    player.previousPosition = { x: 50, y: 0, z: 0 };
+
+    const events: GameEvent[] = [];
+    GameEventMgr.getInstance().addListener(
+      { onGameEvent: (e) => events.push(e) },
+      GameEventType.SunCollision,
+    );
+
+    detector.checkCollisions([sun, player]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(SunCollisionEvent);
+    const evt = events[0] as SunCollisionEvent;
+    expect(evt.sun).toBe(sun);
+    expect(evt.other).toBe(player);
+  });
+
+  it('fires BulletHitEvent (not SunCollision) when bullet hits sun', () => {
+    const sun = new Entity();
+    sun.entityType = EntityType.Sun;
+    sun.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 65 }];
+    sun.position = { x: 0, y: 0, z: 0 };
+    sun.previousPosition = { x: 0, y: 0, z: 0 };
+
+    const shooter = new Entity();
+    shooter.entityType = EntityType.Player;
+
+    const bullet = new Bullet(FLAME_BULLET_CONFIG, shooter);
+    bullet.position = { x: 50, y: 0, z: 0 };
+    bullet.previousPosition = { x: 60, y: 0, z: 0 };
+
+    const sunEvents: GameEvent[] = [];
+    const bulletEvents: GameEvent[] = [];
+    GameEventMgr.getInstance().addListener(
+      { onGameEvent: (e) => sunEvents.push(e) },
+      GameEventType.SunCollision,
+    );
+    GameEventMgr.getInstance().addListener(
+      { onGameEvent: (e) => bulletEvents.push(e) },
+      GameEventType.BulletHit,
+    );
+
+    detector.checkCollisions([sun, bullet]);
+
+    expect(sunEvents).toHaveLength(0);
+    expect(bulletEvents).toHaveLength(1);
+    const hit = bulletEvents[0] as BulletHitEvent;
+    expect(hit.bullet).toBe(bullet);
+    expect(hit.target).toBe(sun);
   });
 });
