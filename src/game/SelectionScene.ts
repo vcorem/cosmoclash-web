@@ -198,6 +198,21 @@ export class SelectionScene {
   }
 
   dispose(): void {
+    this.scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        mesh.geometry?.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(m => m.dispose());
+        } else {
+          (mesh.material as THREE.Material)?.dispose();
+        }
+      }
+      if ((obj as THREE.Points).isPoints) {
+        (obj as THREE.Points).geometry?.dispose();
+        ((obj as THREE.Points).material as THREE.Material)?.dispose();
+      }
+    });
     while (this.scene.children.length > 0) {
       this.scene.remove(this.scene.children[0]);
     }

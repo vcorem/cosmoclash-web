@@ -5,8 +5,10 @@ export class SelectionUI {
   private root: HTMLDivElement;
   private header: HTMLDivElement;
   private nameEl: HTMLDivElement;
-  private weaponEl: HTMLDivElement;
-  private specialEl: HTMLDivElement;
+  private weaponLabel: HTMLSpanElement;
+  private weaponValue: Text;
+  private specialLabel: HTMLSpanElement;
+  private specialValue: Text;
 
   constructor() {
     this.root = document.createElement('div');
@@ -22,19 +24,31 @@ export class SelectionUI {
     this.nameEl = document.createElement('div');
     this.nameEl.className = 'selection-ship-name';
 
-    this.weaponEl = document.createElement('div');
-    this.weaponEl.className = 'selection-row selection-weapon';
+    const weaponEl = document.createElement('div');
+    weaponEl.className = 'selection-row selection-weapon';
+    this.weaponLabel = document.createElement('span');
+    this.weaponLabel.className = 'label';
+    this.weaponLabel.textContent = 'Weapon: ';
+    this.weaponValue = document.createTextNode('');
+    weaponEl.appendChild(this.weaponLabel);
+    weaponEl.appendChild(this.weaponValue);
 
-    this.specialEl = document.createElement('div');
-    this.specialEl.className = 'selection-row selection-special';
+    const specialEl = document.createElement('div');
+    specialEl.className = 'selection-row selection-special';
+    this.specialLabel = document.createElement('span');
+    this.specialLabel.className = 'label';
+    this.specialLabel.textContent = 'Special: ';
+    this.specialValue = document.createTextNode('');
+    specialEl.appendChild(this.specialLabel);
+    specialEl.appendChild(this.specialValue);
 
     const controls = document.createElement('div');
     controls.className = 'selection-controls';
     controls.textContent = '\u2190 \u2192 Browse  |  Enter to Select';
 
     panel.appendChild(this.nameEl);
-    panel.appendChild(this.weaponEl);
-    panel.appendChild(this.specialEl);
+    panel.appendChild(weaponEl);
+    panel.appendChild(specialEl);
     panel.appendChild(controls);
 
     this.root.appendChild(this.header);
@@ -45,8 +59,8 @@ export class SelectionUI {
   show(playerNum: number, character: CharacterDef): void {
     this.header.textContent = `Player ${playerNum} \u2014 Choose Your Ship`;
     this.nameEl.textContent = character.name;
-    this.weaponEl.innerHTML = `<span class="label">Weapon:</span>${character.weapon}`;
-    this.specialEl.innerHTML = `<span class="label">Special:</span>${character.special}`;
+    this.weaponValue.textContent = character.weapon;
+    this.specialValue.textContent = character.special;
     this.root.style.display = '';
   }
 
