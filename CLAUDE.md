@@ -59,7 +59,7 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - `GameEventMgr` singleton with `sendEvent()` / `addListener()` — used for explosion triggers on player/asteroid death
 - `CollisionHandler` emits `ExplosionEvent` when a Player dies or an Asteroid is destroyed by bullet (one-shot kill)
 - Pooled entities (bullets, snots, explosions, asteroids) live OUTSIDE `EntityManager` — they have their own update/sync loops in `main.ts`. `EntityManager` only holds players + sun
-- Asteroids: 3 types with different collision radii (8, 18, 15), 3D glTF meshes with rotation, gravity-affected, wrap-around. Asteroid-player = bounce only (no damage). Asteroid-bullet = instant destroy + explosion
+- Asteroids: 3 types with different collision radii (8, 18, 15), 3D glTF meshes with rotation, wrap-around, no gravity (matches C++). Asteroid-player = bounce only (no damage, simple velocity redirect). Asteroid-bullet = instant destroy + smaller explosion (150 vs 300 billboard)
 - Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion
 
 **Input bindings:**
