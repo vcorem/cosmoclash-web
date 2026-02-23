@@ -1,4 +1,4 @@
-import { Entity, EntityType } from '@/engine/Entity';
+import { Entity, EntityType, Vec3 } from '@/engine/Entity';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from './Bullet';
 import { Snot, SNOT_CONFIG } from './Snot';
 import { ARENA } from './Arena';
@@ -164,6 +164,20 @@ export class Player extends Entity {
 
   getEffectiveRotSpeed(): number {
     return this.stats.rotationSpeed / (Math.floor(this.snotCount / 3) + 1);
+  }
+
+  resetForNewRound(spawnPosition: Vec3): void {
+    this.health = 1;
+    this.energy = 1;
+    this.alive = true;
+    this.position = { ...spawnPosition };
+    this.previousPosition = { ...spawnPosition };
+    this.accelVec = { x: 0, y: 0, z: 0 };
+    this.primaryCooldown = 0;
+    this.secondaryCooldown = 0;
+    this.snotCount = 0;
+    this.angle = 0;
+    this.rollAngle = 0;
   }
 
   private moveToward(current: number, target: number, maxDelta: number): number {

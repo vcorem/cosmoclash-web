@@ -305,6 +305,44 @@ describe('Player', () => {
     });
   });
 
+  describe('resetForNewRound', () => {
+    it('restores health, energy, and alive status', () => {
+      const p = new Player(GONDI_STATS);
+      p.health = 0;
+      p.energy = 0.3;
+      p.alive = false;
+      p.resetForNewRound({ x: -500, y: -70, z: 0 });
+      expect(p.health).toBe(1);
+      expect(p.energy).toBe(1);
+      expect(p.alive).toBe(true);
+    });
+
+    it('resets position and velocity', () => {
+      const p = new Player(GONDI_STATS);
+      p.position = { x: 999, y: 999, z: 0 };
+      p.accelVec = { x: 1, y: 1, z: 0 };
+      p.resetForNewRound({ x: -500, y: -70, z: 0 });
+      expect(p.position).toEqual({ x: -500, y: -70, z: 0 });
+      expect(p.previousPosition).toEqual({ x: -500, y: -70, z: 0 });
+      expect(p.accelVec).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it('resets cooldowns, snot count, angle, and roll', () => {
+      const p = new Player(GONDI_STATS);
+      p.primaryCooldown = 100;
+      p.secondaryCooldown = 200;
+      p.snotCount = 5;
+      p.angle = 180;
+      p.rollAngle = 45;
+      p.resetForNewRound({ x: 0, y: 0, z: 0 });
+      expect(p.primaryCooldown).toBe(0);
+      expect(p.secondaryCooldown).toBe(0);
+      expect(p.snotCount).toBe(0);
+      expect(p.angle).toBe(0);
+      expect(p.rollAngle).toBe(0);
+    });
+  });
+
   describe('fireSecondary', () => {
     it('creates a snot when fired', () => {
       const p = new Player(GONDI_STATS);
