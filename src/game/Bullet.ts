@@ -1,4 +1,5 @@
 import { Entity, EntityType } from '@/engine/Entity';
+import { SoundEffect } from '@/audio/SoundEffect';
 
 export interface BulletConfig {
   speedMaxScaler: number;
@@ -8,6 +9,7 @@ export interface BulletConfig {
   tracking?: boolean;
   expandingRadius?: { min: number; max: number };
   decayingDamage?: { initial: number };
+  sound?: SoundEffect;
 }
 
 export const FLAME_BULLET_CONFIG: BulletConfig = {
@@ -15,6 +17,7 @@ export const FLAME_BULLET_CONFIG: BulletConfig = {
   maxTtl: 700,
   damage: 0.05,
   collisionRadius: 10,
+  sound: SoundEffect.FlameShot,
 };
 
 export const PLASMA_BULLET_CONFIG: BulletConfig = {
@@ -25,6 +28,7 @@ export const PLASMA_BULLET_CONFIG: BulletConfig = {
   tracking: true,
   expandingRadius: { min: 0, max: 70 },
   decayingDamage: { initial: 0.3 },
+  sound: SoundEffect.PlasmaShot,
 };
 
 export const SUN_BULLET_CONFIG: BulletConfig = {
@@ -32,6 +36,7 @@ export const SUN_BULLET_CONFIG: BulletConfig = {
   maxTtl: 1000,
   damage: 0.1,
   collisionRadius: 2,
+  sound: SoundEffect.SunShot,
 };
 
 export class Bullet extends Entity {

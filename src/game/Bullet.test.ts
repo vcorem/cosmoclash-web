@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Bullet, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG } from './Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
+import { SoundEffect } from '@/audio/SoundEffect';
 
 describe('Bullet', () => {
   describe('FLAME_BULLET_CONFIG', () => {
@@ -9,6 +10,10 @@ describe('Bullet', () => {
       expect(FLAME_BULLET_CONFIG.maxTtl).toBe(700);
       expect(FLAME_BULLET_CONFIG.damage).toBe(0.05);
       expect(FLAME_BULLET_CONFIG.collisionRadius).toBe(10);
+    });
+
+    it('has flame shot sound', () => {
+      expect(FLAME_BULLET_CONFIG.sound).toBe(SoundEffect.FlameShot);
     });
   });
 
@@ -22,6 +27,10 @@ describe('Bullet', () => {
       expect(PLASMA_BULLET_CONFIG.expandingRadius).toEqual({ min: 0, max: 70 });
       expect(PLASMA_BULLET_CONFIG.decayingDamage).toEqual({ initial: 0.3 });
     });
+
+    it('has plasma shot sound', () => {
+      expect(PLASMA_BULLET_CONFIG.sound).toBe(SoundEffect.PlasmaShot);
+    });
   });
 
   describe('SUN_BULLET_CONFIG', () => {
@@ -30,6 +39,10 @@ describe('Bullet', () => {
       expect(SUN_BULLET_CONFIG.maxTtl).toBe(1000);
       expect(SUN_BULLET_CONFIG.damage).toBe(0.1);
       expect(SUN_BULLET_CONFIG.collisionRadius).toBe(2);
+    });
+
+    it('has sun shot sound', () => {
+      expect(SUN_BULLET_CONFIG.sound).toBe(SoundEffect.SunShot);
     });
   });
 
