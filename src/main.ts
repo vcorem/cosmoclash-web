@@ -25,6 +25,8 @@ import { HUD } from '@/ui/HUD';
 import { SelectionScene, SelectionState } from '@/game/SelectionScene';
 import { SelectionUI } from '@/ui/SelectionUI';
 import { CharacterDef } from '@/game/CharacterRegistry';
+import { LogoSplash } from '@/ui/LogoSplash';
+import { MainMenu } from '@/ui/MainMenu';
 import '@/ui/hud.css';
 
 // Setup Three.js — melee scene (persistent across rounds)
@@ -416,17 +418,38 @@ const cameraController = new CameraController();
 // HUD overlay — created when entering melee, destroyed on return to selection
 let hud: HUD | null = null;
 
-// Game state — starts in selection screen
-type GameState = 'selection' | 'playing' | 'gameOver';
-let gameState: GameState = 'selection';
+// Game state — starts with logo splash
+type GameState = 'logo' | 'menu' | 'selection' | 'playing' | 'gameOver';
+let gameState: GameState = 'logo';
 let winnerNum: 1 | 2 = 1;
 let gameOverDelay = 0;
 const GAME_OVER_DELAY_MS = 1500;
 
+// Menu state
+let mainMenu: MainMenu | null = null;
+
+function showMainMenu(): void {
+  mainMenu = new MainMenu(() => {
+    mainMenu!.destroy();
+    mainMenu = null;
+    showSelectionScreen();
+  });
+  gameState = 'menu';
+}
+
+function showSelectionScreen(): void {
+  selectionScene = new SelectionScene();
+  selectionUI = new SelectionUI();
+  selectionUI.show(2, selectionScene.getCurrentCharacter());
+  gameState = 'selection';
+}
+
+// Logo splash → main menu
+new LogoSplash(() => showMainMenu());
+
 // Selection screen state
-let selectionScene: SelectionScene | null = new SelectionScene();
-let selectionUI: SelectionUI | null = new SelectionUI();
-selectionUI.show(2, selectionScene.getCurrentCharacter());
+let selectionScene: SelectionScene | null = null;
+let selectionUI: SelectionUI | null = null;
 
 // Collision detection
 const collisionDetector = new CollisionDetector();
@@ -620,11 +643,8 @@ window.addEventListener('keydown', () => {
     hud = null;
   }
 
-  // Return to selection screen
-  selectionScene = new SelectionScene();
-  selectionUI = new SelectionUI();
-  selectionUI.show(2, selectionScene.getCurrentCharacter());
-  gameState = 'selection';
+  // Return to main menu
+  showMainMenu();
 });
 
 // Per-player update helper
@@ -713,6 +733,10 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
+    if (gameState === 'logo' || gameState === 'menu') {
+      return; // HTML overlays handle these states
+    }
+
     if (gameState === 'selection') {
       // Update selection scene animation
       if (selectionScene) {
@@ -934,8 +958,10 @@ const gameLoop = new GameLoop(
     }
   },
   () => {
-    // Render: switch between selection scene and melee scene
-    if (gameState === 'selection' && selectionScene) {
+    // Render: switch scene based on game state
+    if (gameState === 'logo' || gameState === 'menu') {
+      renderer.clear();
+    } else if (gameState === 'selection' && selectionScene) {
       renderer.render(selectionScene.scene, selectionScene.camera);
     } else {
       renderer.render(scene, camera);
