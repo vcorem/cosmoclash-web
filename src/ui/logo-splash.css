@@ -2,19 +2,11 @@
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f5dc;
+  background: url('/textures/logo.jpg') center / cover no-repeat;
   opacity: 0;
   transition: opacity 1000ms ease-in-out;
 }
 
 #logo-splash.visible {
   opacity: 1;
-}
-
-#logo-splash img {
-  max-width: 60%;
-  max-height: 60%;
 }

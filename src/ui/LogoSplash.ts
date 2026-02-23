@@ -12,11 +12,6 @@ export class LogoSplash {
 
     this.root = document.createElement('div');
     this.root.id = 'logo-splash';
-
-    const img = document.createElement('img');
-    img.src = '/textures/logo.jpg';
-    img.alt = 'PixtaZy Presents';
-    this.root.appendChild(img);
     document.body.appendChild(this.root);
 
     this.skipHandler = () => this.finish();
