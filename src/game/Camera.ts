@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { ARENA } from './Arena';
 
-export function createCamera(): THREE.PerspectiveCamera {
+export function createCamera(aspect = 4 / 3): THREE.PerspectiveCamera {
   const fovDegrees = (0.3 * 180) / Math.PI;
-  const aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(fovDegrees, aspect, 0.1, 100000);
 
   // Start centered between spawn points

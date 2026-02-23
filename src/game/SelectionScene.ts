@@ -33,7 +33,7 @@ export class SelectionScene {
   private flyAnims: { group: THREE.Group; startZ: number; endZ: number; elapsed: number }[] = [];
   private camFly: { startX: number; endX: number; elapsed: number } | null = null;
 
-  constructor() {
+  constructor(aspect = 4 / 3) {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x000011);
     const ambient = new THREE.AmbientLight(0x999999);
@@ -43,7 +43,7 @@ export class SelectionScene {
     this.scene.add(dirLight);
 
     this.camera = new THREE.PerspectiveCamera(
-      CAM_FOV, window.innerWidth / window.innerHeight, 0.1, 100000,
+      CAM_FOV, aspect, 0.1, 100000,
     );
     const initialX = this.getShipX(0);
     this.camera.position.set(initialX, 0, CAM_Z);
