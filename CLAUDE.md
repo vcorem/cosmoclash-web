@@ -50,7 +50,7 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 
 ## Current Implementation State
 
-**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids)
+**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI)
 
 **Tech stack:** Three.js, TypeScript, Vite, Vitest
 
@@ -60,7 +60,11 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - `CollisionHandler` emits `ExplosionEvent` when a Player dies or an Asteroid is destroyed by bullet (one-shot kill)
 - Pooled entities (bullets, snots, explosions, asteroids) live OUTSIDE `EntityManager` — they have their own update/sync loops in `main.ts`. `EntityManager` only holds players + sun
 - Asteroids: 3 types with different collision radii (8, 18, 15), 3D glTF meshes with rotation, wrap-around, no gravity (matches C++). Asteroid-player = bounce only (no damage, simple velocity redirect). Asteroid-bullet = instant destroy + smaller explosion (150 vs 300 billboard)
-- Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion
+- HUD: HTML/CSS overlay (`src/ui/HUD.ts` + `src/ui/hud.css`) with 40-segment health/energy bars per player, gradient colors matching original C++ PlayerPanel. Energy bars have CSS decay animation on empty segments
+- Game state: `'playing' | 'gameOver'` in main.ts. Winner detection after collision, 1500ms delay for explosion, "Player X Wins!" overlay with press-any-key restart
+- `EntityPool.releaseAll()` clears all active entities to free list (used during restart)
+- `Player.resetForNewRound(spawnPos)` resets all player state for round restart
+- Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion (gated on playing state)
 
 **Input bindings:**
 - Player 1: ArrowUp/Left/Right (thrust/rotate), `/` (fire), `.` (secondary)
