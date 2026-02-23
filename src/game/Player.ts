@@ -27,7 +27,7 @@ const ROLL_SCALER = 0.6;
 const ROLL_MAX_ANGLE = 70;
 
 export class Player extends Entity {
-  readonly stats: CharacterStats;
+  stats: CharacterStats;
   rollAngle: number = 0;
   energy: number = 1;
   primaryCooldown: number = 0;
