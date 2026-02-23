@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
-import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
+import { Bullet, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG } from './Bullet';
 import { Asteroid } from './Asteroid';
 import { Snot } from './Snot';
 import { Player, GONDI_STATS } from './Player';
@@ -488,6 +488,61 @@ describe('CollisionHandler', () => {
       expect(asteroid.accelVec.x).toBeLessThan(0);
       // Player should move away from asteroid (positive x)
       expect(player.accelVec.x).toBeGreaterThan(0);
+    });
+  });
+
+  describe('plasma bullet damage decay', () => {
+    it('uses decaying damage from plasma bullet', () => {
+      const bullet = new Bullet(PLASMA_BULLET_CONFIG);
+      bullet.update(5000); // Half TTL elapsed
+      const target = new Player(GONDI_STATS);
+      target.health -= bullet.getCurrentDamage();
+      expect(target.health).toBeCloseTo(1 - 0.15);
+    });
+
+    it('applies full damage from fresh plasma bullet via handler', () => {
+      const shooter = new Entity();
+      const bullet = new Bullet(PLASMA_BULLET_CONFIG, shooter);
+      const target = new Player(GONDI_STATS);
+      target.health = 1;
+
+      const event = new BulletHitEvent(bullet, target);
+      handler.onGameEvent(event);
+
+      expect(target.health).toBeCloseTo(1 - 0.3);
+    });
+
+    it('applies reduced damage from aged plasma bullet via handler', () => {
+      const shooter = new Entity();
+      const bullet = new Bullet(PLASMA_BULLET_CONFIG, shooter);
+      bullet.update(5000); // Half TTL elapsed
+      const target = new Player(GONDI_STATS);
+      target.health = 1;
+
+      const event = new BulletHitEvent(bullet, target);
+      handler.onGameEvent(event);
+
+      expect(target.health).toBeCloseTo(1 - 0.15);
+    });
+  });
+
+  describe('plasma-plasma interaction', () => {
+    it('reduces TTL of both bullets by 100ms instead of destroying', () => {
+      const shooter1 = new Entity();
+      const shooter2 = new Entity();
+      const bullet1 = new Bullet(PLASMA_BULLET_CONFIG, shooter1);
+      const bullet2 = new Bullet(PLASMA_BULLET_CONFIG, shooter2);
+
+      const initialTtl1 = bullet1.ttl;
+      const initialTtl2 = bullet2.ttl;
+
+      const event = new BulletHitEvent(bullet1, bullet2);
+      handler.onGameEvent(event);
+
+      expect(bullet1.ttl).toBe(initialTtl1 - 100);
+      expect(bullet2.ttl).toBe(initialTtl2 - 100);
+      expect(bullet1.alive).toBe(true);
+      expect(bullet2.alive).toBe(true);
     });
   });
 
