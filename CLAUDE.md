@@ -50,7 +50,7 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 
 ## Current Implementation State
 
-**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI)
+**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI), M10 (MichiGichi ship & weapons)
 
 **Tech stack:** Three.js, TypeScript, Vite, Vitest
 
@@ -65,10 +65,13 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - `EntityPool.releaseAll()` clears all active entities to free list (used during restart)
 - `Player.resetForNewRound(spawnPos)` resets all player state for round restart
 - Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion (gated on playing state)
+- MichiGichiPlayer (`src/game/MichiGichiPlayer.ts`): extends Player with 4-state morph machine (MICHI ↔ GICHI). MICHI form = slow (0.2 speed), plasma weapon. GICHI form = fast (1.0 speed), sun weapon. Secondary weapon triggers morph (no projectile). 20ms frame delay × 42 frames ≈ 840ms transition. Two collision spheres: (0,-10,0) r14 and (0,10,0) r14
+- BulletConfig optional fields: `tracking?`, `expandingRadius?`, `decayingDamage?` — Bullet.update() applies dynamic behaviors when present. `getCurrentDamage()` returns decaying or flat damage. Plasma-plasma collision reduces both TTLs by 100ms
+- Player 1 = MichiGichiPlayer (michiGichi.glb with AnimationMixer for morph), Player 2 = Gondi (gondi.glb)
 
 **Input bindings:**
-- Player 1: ArrowUp/Left/Right (thrust/rotate), `/` (fire), `.` (secondary)
-- Player 2: WASD (thrust/rotate), Space (fire), Shift (secondary)
+- Player 1: ArrowUp/Left/Right (thrust/rotate), `/` (fire), `.` (morph/secondary)
+- Player 2: WASD (thrust/rotate), Space (fire), Shift (secondary/snot)
 
 ## Sprite Atlas Best Practices
 
@@ -105,6 +108,6 @@ texture.offset.set(col / cols, 1 - (row + 1) / rows);
 
 ```bash
 npm run dev          # Start dev server
-npx vitest run       # Run all tests (233 tests)
+npx vitest run       # Run all tests (296 tests)
 npx tsc --noEmit     # Type check
 ```
