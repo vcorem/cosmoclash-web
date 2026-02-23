@@ -3,8 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GameLoop } from '@/engine/GameLoop';
 import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
+import { MichiGichiPlayer } from '@/game/MichiGichiPlayer';
 import { ARENA } from '@/game/Arena';
-import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from '@/game/Bullet';
+import { Bullet, BulletConfig, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG } from '@/game/Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
 import { EntityPool } from '@/engine/EntityPool';
 import { InputManager, PlayerInput } from '@/input/InputManager';
@@ -38,7 +39,7 @@ window.addEventListener('resize', () => {
 });
 
 // Create players
-const player1 = new Player(GONDI_STATS);
+const player1 = new MichiGichiPlayer();
 player1.position = { ...ARENA.PLAYER1_SPAWN };
 player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
 
@@ -91,8 +92,50 @@ function loadShipModel(
 
 let p1Mesh: THREE.Object3D | null = null;
 let p2Mesh: THREE.Object3D | null = null;
+let p1Mixer: THREE.AnimationMixer | null = null;
+let p1AnimAction: THREE.AnimationAction | null = null;
 
-loadShipModel((mesh) => { p1Mesh = mesh; }, 0x00ff88);
+// Load MichiGichi model with animation for Player 1
+loader.load(
+  '/models/michiGichi.glb',
+  (gltf) => {
+    const container = new THREE.Group();
+    const model = gltf.scene.clone();
+    model.scale.set(2.0, 2.0, 2.0);
+    model.rotation.set(-90 * rad, 0, 0);
+    model.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+        if (mat.emissive) mat.emissive.set(0, 0, 0);
+      }
+    });
+    container.add(model);
+    scene.add(container);
+    p1Mesh = container;
+
+    if (gltf.animations.length > 0) {
+      p1Mixer = new THREE.AnimationMixer(model);
+      const clip = gltf.animations[0];
+      p1AnimAction = p1Mixer.clipAction(clip);
+      p1AnimAction.play();
+      p1AnimAction.paused = true;
+    }
+  },
+  undefined,
+  () => {
+    console.warn('Could not load michiGichi.glb, using placeholder');
+    const container = new THREE.Group();
+    const geo = new THREE.ConeGeometry(8, 20, 8);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xff8800 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.set(0, 270 * rad, 90 * rad);
+    container.add(mesh);
+    scene.add(container);
+    p1Mesh = container;
+  },
+);
+
+// Load Gondi model for Player 2 (unchanged)
 loadShipModel((mesh) => {
   p2Mesh = mesh;
   mesh.position.set(player2.position.x, player2.position.y, 0);
@@ -100,6 +143,8 @@ loadShipModel((mesh) => {
 
 // Load flame texture
 const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
+const plasmaTexture = new THREE.TextureLoader().load('/textures/plasma_atlas.png');
+const sunShotTexture = new THREE.TextureLoader().load('/textures/sun_shot.png');
 
 // Bullet pool with sprite management
 const BULLET_POOL_SIZE = 50;
@@ -110,20 +155,41 @@ const bulletPool = new EntityPool<Bullet>(
 );
 const bulletSpriteMap = new Map<Bullet, THREE.Sprite>();
 
-function acquireBullet(config: BulletConfig, origin: Entity): Bullet {
+function acquireBullet(config: BulletConfig, origin: Entity, target?: Entity): Bullet {
   const bullet = bulletPool.acquire();
   bullet.reset(config, origin);
+  if (config.tracking && target) {
+    bullet.trackingTarget = target;
+  }
+
   if (!bulletSpriteMap.has(bullet)) {
     const mat = new THREE.SpriteMaterial({
       map: flameTexture,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      transparent: true,
     });
     const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(35, 35, 1);
     bulletSpriteMap.set(bullet, sprite);
   }
   const sprite = bulletSpriteMap.get(bullet)!;
+
+  const mat = sprite.material as THREE.SpriteMaterial;
+  if (config === PLASMA_BULLET_CONFIG) {
+    mat.map = plasmaTexture.clone();
+    mat.map.repeat.set(1 / 10, 1 / 8);
+    mat.map.wrapS = THREE.RepeatWrapping;
+    mat.map.wrapT = THREE.RepeatWrapping;
+    sprite.scale.set(20, 20, 1);
+  } else if (config === SUN_BULLET_CONFIG) {
+    mat.map = sunShotTexture;
+    sprite.scale.set(10, 10, 1);
+  } else {
+    mat.map = flameTexture;
+    sprite.scale.set(35, 35, 1);
+  }
+  mat.needsUpdate = true;
+
   sprite.visible = true;
   scene.add(sprite);
   return bullet;
@@ -480,7 +546,7 @@ function updatePlayerInput(
       player.energy -= player.stats.primaryEnergyCost;
       player.primaryCooldown = player.stats.primaryWeaponDelay;
 
-      const bullet = acquireBullet(player.stats.primaryBulletConfig, player);
+      const bullet = acquireBullet(player.stats.primaryBulletConfig, player, enemy);
       bullet.angle = player.angle;
 
       const spawnVec = player.getFullSpeedVec(25);
@@ -496,22 +562,26 @@ function updatePlayerInput(
   }
 
   if (pi.fireSecondary) {
-    if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
-      player.energy -= player.stats.primaryEnergyCost;
-      player.secondaryCooldown = ARENA.SECONDARY_WEAPON_DELAY;
+    if (player instanceof MichiGichiPlayer) {
+      player.triggerMorph();
+    } else {
+      if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
+        player.energy -= player.stats.primaryEnergyCost;
+        player.secondaryCooldown = ARENA.SECONDARY_WEAPON_DELAY;
 
-      const snot = acquireSnot(player, enemy);
-      snot.angle = player.angle;
+        const snot = acquireSnot(player, enemy);
+        snot.angle = player.angle;
 
-      const spawnVec = player.getFullSpeedVec(25);
-      snot.position = {
-        x: player.position.x + spawnVec.x,
-        y: player.position.y + spawnVec.y,
-        z: player.position.z,
-      };
-      snot.previousPosition = { ...snot.position };
-      const speedVec = player.getFullSpeedVec(SNOT_CONFIG.speedMaxScaler);
-      snot.accelVec = { ...speedVec };
+        const spawnVec = player.getFullSpeedVec(25);
+        snot.position = {
+          x: player.position.x + spawnVec.x,
+          y: player.position.y + spawnVec.y,
+          z: player.position.z,
+        };
+        snot.previousPosition = { ...snot.position };
+        const speedVec = player.getFullSpeedVec(SNOT_CONFIG.speedMaxScaler);
+        snot.accelVec = { ...speedVec };
+      }
     }
   }
 }
@@ -545,6 +615,10 @@ const gameLoop = new GameLoop(
       // Process input for both players
       updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
       updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
+
+      if (player1 instanceof MichiGichiPlayer) {
+        player1.updateMorph(dt);
+      }
 
       // Update entities
       entityManager.update(dt, camCenter);
@@ -608,11 +682,41 @@ const gameLoop = new GameLoop(
     if (p1Mesh) p1Mesh.visible = player1.alive;
     if (p2Mesh) p2Mesh.visible = player2.alive;
 
+    // Sync MichiGichi morph animation frame
+    if (p1Mixer && p1AnimAction && player1 instanceof MichiGichiPlayer) {
+      const clip = p1AnimAction.getClip();
+      p1AnimAction.time = (player1.currentAnimFrame / 42) * clip.duration;
+      p1Mixer.update(0);
+    }
+
     // Sync bullet sprites and release dead ones
     bulletPool.forEachActive((bullet) => {
       const sprite = bulletSpriteMap.get(bullet);
       if (!sprite) return;
       sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
+
+      if (bullet.config === PLASMA_BULLET_CONFIG) {
+        const mat = sprite.material as THREE.SpriteMaterial;
+        if (mat.map) {
+          const elapsed = bullet.config.maxTtl - bullet.ttl;
+          let frameIndex: number;
+          const fadeInDuration = 41 / 0.4;
+          if (elapsed < fadeInDuration * 42) {
+            frameIndex = Math.min(Math.floor(elapsed / (1000 / 0.4 / 42)), 41);
+          } else {
+            const loopElapsed = elapsed - fadeInDuration * 42;
+            const loopFrame = Math.floor(loopElapsed / (1000 / 0.03 / 39));
+            frameIndex = 41 + (loopFrame % 39);
+          }
+          frameIndex = Math.min(frameIndex, 79);
+          const col = frameIndex % 10;
+          const row = Math.floor(frameIndex / 10);
+          mat.map.offset.set(col / 10, 1 - (row + 1) / 8);
+        }
+        const age = (bullet.config.maxTtl - bullet.ttl) / bullet.config.maxTtl;
+        const size = 20 + age * 10;
+        sprite.scale.set(size, size, 1);
+      }
     });
     bulletPool.releaseInactive();
     for (const [bullet, sprite] of bulletSpriteMap) {
