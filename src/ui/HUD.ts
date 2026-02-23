@@ -9,8 +9,8 @@ export interface RGB {
 // Original C++ colors from PlayerPanel.cpp
 export const HEALTH_COLOR_FULL: RGB = { r: 250, g: 50, b: 50 };
 export const HEALTH_COLOR_EMPTY: RGB = { r: 120, g: 10, b: 10 };
-export const ENERGY_COLOR_FULL: RGB = { r: 250, g: 40, b: 0 };
-export const ENERGY_COLOR_EMPTY: RGB = { r: 250, g: 200, b: 0 };
+export const ENERGY_COLOR_FULL: RGB = { r: 40, g: 80, b: 250 };
+export const ENERGY_COLOR_EMPTY: RGB = { r: 10, g: 20, b: 120 };
 export const SEGMENT_INACTIVE_COLOR: RGB = { r: 40, g: 40, b: 40 };
 
 export function computeActiveSegments(value: number): number {
@@ -147,6 +147,7 @@ export class HUD {
         if (useDecay) segs[i].classList.remove('decaying');
       } else {
         if (useDecay) {
+          segs[i].style.backgroundColor = '';  // Remove inline style so CSS class takes over
           segs[i].classList.add('decaying');
         } else {
           segs[i].style.backgroundColor = inactiveColor;

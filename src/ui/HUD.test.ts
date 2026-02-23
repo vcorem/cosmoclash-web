@@ -34,10 +34,10 @@ describe('HUD segment calculations', () => {
 
     it('interpolates between full and empty', () => {
       const c = computeSegmentColor(20, ENERGY_COLOR_FULL, ENERGY_COLOR_EMPTY);
-      // Midpoint between (250,40,0) and (250,200,0) -> (250,~122,0)
-      expect(c.r).toBe(250);
-      expect(c.g).toBeCloseTo(122, 0); // 40 + (200-40) * 20/39 ≈ 122
-      expect(c.b).toBe(0);
+      // Midpoint between (40,80,250) and (10,20,120) at t=20/39≈0.513
+      expect(c.r).toBeCloseTo(25, 0);  // 40 + (10-40) * 20/39 ≈ 25
+      expect(c.g).toBeCloseTo(49, 0);  // 80 + (20-80) * 20/39 ≈ 49
+      expect(c.b).toBeCloseTo(183, 0); // 250 + (120-250) * 20/39 ≈ 183
     });
   });
 });
