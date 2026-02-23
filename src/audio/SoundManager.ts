@@ -9,10 +9,12 @@ export class SoundManager {
   private musicGain: GainNode | null = null;
   private buffers = new Map<SoundEffect, AudioBuffer>();
   private musicBuffers = new Map<string, AudioBuffer>();
+  private rawBuffers = new Map<string, ArrayBuffer>(); // raw fetched data before decode
   private musicSource: AudioBufferSourceNode | null = null;
   private currentMusicKey: string | null = null;
   private preloadPromise: Promise<void> | null = null;
   private pendingMusicKey: string | null = null;
+  private decoded = false;
 
   private masterVolume: number;
   private muted: boolean;
@@ -59,23 +61,19 @@ export class SoundManager {
   }
 
   private async doPreload(): Promise<void> {
-    const ctx = this.ensureContext();
-
-    // Preload SFX
+    // Phase 1: Fetch raw ArrayBuffers (no AudioContext needed)
     const sfxEntries = Object.values(SoundEffect) as SoundEffect[];
     const sfxPromises = sfxEntries.map(async (effect) => {
       const config = SOUND_CONFIG[effect];
       try {
         const resp = await fetch(config.file);
         const arrayBuf = await resp.arrayBuffer();
-        const audioBuf = await ctx.decodeAudioData(arrayBuf);
-        this.buffers.set(effect, audioBuf);
+        this.rawBuffers.set(`sfx:${effect}`, arrayBuf);
       } catch {
         console.warn(`Failed to load sound: ${config.file}`);
       }
     });
 
-    // Preload music
     const musicFiles: Record<string, string> = {
       intro: '/sounds/Melee_Intro.ogg',
       battle: '/sounds/MeleeTheme.ogg',
@@ -84,16 +82,40 @@ export class SoundManager {
       try {
         const resp = await fetch(file);
         const arrayBuf = await resp.arrayBuffer();
-        const audioBuf = await ctx.decodeAudioData(arrayBuf);
-        this.musicBuffers.set(key, audioBuf);
+        this.rawBuffers.set(`music:${key}`, arrayBuf);
       } catch {
         console.warn(`Failed to load music: ${file}`);
       }
     });
 
     await Promise.all([...sfxPromises, ...musicPromises]);
+  }
 
-    // Play any music that was requested before preload finished
+  /** Decode raw ArrayBuffers into AudioBuffers (requires AudioContext from user gesture) */
+  private async decodeAll(): Promise<void> {
+    if (this.decoded) return;
+    this.decoded = true;
+    const ctx = this.ensureContext();
+
+    const promises: Promise<void>[] = [];
+    for (const [key, raw] of this.rawBuffers) {
+      promises.push((async () => {
+        try {
+          const audioBuf = await ctx.decodeAudioData(raw);
+          if (key.startsWith('sfx:')) {
+            this.buffers.set(key.slice(4) as SoundEffect, audioBuf);
+          } else if (key.startsWith('music:')) {
+            this.musicBuffers.set(key.slice(6), audioBuf);
+          }
+        } catch {
+          console.warn(`Failed to decode: ${key}`);
+        }
+      })());
+    }
+    await Promise.all(promises);
+    this.rawBuffers.clear();
+
+    // Play any music that was requested before decode finished
     if (this.pendingMusicKey) {
       const key = this.pendingMusicKey;
       this.pendingMusicKey = null;
@@ -102,12 +124,12 @@ export class SoundManager {
   }
 
   play(effect: SoundEffect): void {
+    if (!this.decoded) this.decodeAll();
     const buf = this.buffers.get(effect);
     if (!buf || this.muted) return;
     const ctx = this.ensureContext();
     const source = ctx.createBufferSource();
     source.buffer = buf;
-    // Per-sound volume via a temporary gain node
     const vol = ctx.createGain();
     vol.gain.value = SOUND_CONFIG[effect].volume;
     vol.connect(this.sfxGain!);
@@ -118,9 +140,16 @@ export class SoundManager {
   playMusic(key: string): void {
     if (this.currentMusicKey === key) return;
     this.stopMusic();
+
+    // If not decoded yet, trigger decode (creates AudioContext from user gesture) and queue
+    if (!this.decoded) {
+      this.pendingMusicKey = key;
+      this.decodeAll();
+      return;
+    }
+
     const buf = this.musicBuffers.get(key);
     if (!buf) {
-      // Buffers not loaded yet — queue for after preload completes
       this.pendingMusicKey = key;
       return;
     }
