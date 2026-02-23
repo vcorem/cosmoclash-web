@@ -59,15 +59,54 @@ export class SelectionScene {
     const extent = 7000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * extent;
       positions[i * 3 + 1] = (Math.random() - 0.5) * extent;
-      positions[i * 3 + 2] = 0;
+      positions[i * 3 + 2] = Math.random() * extent;
+      // Brightness from depth matching C++ original: closer = brighter
+      const depthRatio = positions[i * 3 + 2] / extent;
+      const brightness = 1 - depthRatio;
+      colors[i * 3] = brightness * 0.53;
+      colors[i * 3 + 1] = brightness * 0.53;
+      colors[i * 3 + 2] = brightness;
     }
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const material = new THREE.PointsMaterial({
-      color: 0x8888ff, size: 2, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const starTexture = new THREE.TextureLoader().load('/textures/star_test-02.jpg');
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: starTexture },
+        starSize: { value: 30.0 },
+        maxPointSize: { value: 40.0 },
+        viewportHeight: { value: window.innerHeight * window.devicePixelRatio },
+      },
+      vertexShader: `
+        attribute vec3 color;
+        varying vec3 vColor;
+        uniform float starSize;
+        uniform float maxPointSize;
+        uniform float viewportHeight;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = min(starSize * (viewportHeight * 0.5 / -mvPosition.z), maxPointSize);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D map;
+        varying vec3 vColor;
+        void main() {
+          vec4 texColor = texture2D(map, gl_PointCoord);
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          gl_FragColor = vec4(texColor.rgb * vColor, texColor.a);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     const stars = new THREE.Points(geometry, material);
     stars.position.z = 3500;

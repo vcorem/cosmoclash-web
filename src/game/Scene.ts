@@ -20,15 +20,22 @@ export function createScene(): THREE.Scene {
 export function createStarField(): THREE.Points {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(ARENA.NUM_STARS * 3);
+  const colors = new Float32Array(ARENA.NUM_STARS * 3);
   const extent = ARENA.STARS_EXTENT;
 
   for (let i = 0; i < ARENA.NUM_STARS; i++) {
     positions[i * 3] = (Math.random() - 0.5) * extent;
     positions[i * 3 + 1] = (Math.random() - 0.5) * extent;
-    positions[i * 3 + 2] = 0; // flat plane — parent z handles depth
+    positions[i * 3 + 2] = Math.random() * extent; // random Z depth in cube
+    // Brightness from depth matching C++ CStarsNode: closer = brighter
+    const brightness = (extent - positions[i * 3 + 2]) / extent;
+    colors[i * 3] = brightness;
+    colors[i * 3 + 1] = brightness;
+    colors[i * 3 + 2] = brightness;
   }
 
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   // Original uses star_test-02.jpg (blue glow) as 10x10 billboard quads
   // with EMT_TRANSPARENT_ADD_COLOR (additive blending).
@@ -38,15 +45,18 @@ export function createStarField(): THREE.Points {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: starTexture },
-      starSize: { value: 30.0 },
-      maxPointSize: { value: 40.0 },
+      starSize: { value: 50.0 },
+      maxPointSize: { value: 60.0 },
       viewportHeight: { value: window.innerHeight * window.devicePixelRatio },
     },
     vertexShader: `
+      attribute vec3 color;
+      varying vec3 vColor;
       uniform float starSize;
       uniform float maxPointSize;
       uniform float viewportHeight;
       void main() {
+        vColor = color;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_PointSize = min(starSize * (viewportHeight * 0.5 / -mvPosition.z), maxPointSize);
         gl_Position = projectionMatrix * mvPosition;
@@ -54,11 +64,12 @@ export function createStarField(): THREE.Points {
     `,
     fragmentShader: `
       uniform sampler2D map;
+      varying vec3 vColor;
       void main() {
         vec4 texColor = texture2D(map, gl_PointCoord);
         float dist = length(gl_PointCoord - vec2(0.5));
         if (dist > 0.5) discard;
-        gl_FragColor = texColor;
+        gl_FragColor = vec4(texColor.rgb * vColor, texColor.a);
       }
     `,
     transparent: true,
