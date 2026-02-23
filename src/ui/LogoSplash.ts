@@ -16,7 +16,6 @@ export class LogoSplash {
 
     this.skipHandler = () => this.finish();
     window.addEventListener('keydown', this.skipHandler);
-    window.addEventListener('click', this.skipHandler);
 
     // Fade in on next frame
     requestAnimationFrame(() => {
@@ -39,7 +38,6 @@ export class LogoSplash {
     this.done = true;
     for (const t of this.timers) clearTimeout(t);
     window.removeEventListener('keydown', this.skipHandler);
-    window.removeEventListener('click', this.skipHandler);
     this.root.remove();
     this.onComplete();
   }

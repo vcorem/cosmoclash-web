@@ -27,10 +27,11 @@ export class SoundManager {
     this.installUnlockListener();
   }
 
-  /** Create/resume AudioContext on first user gesture (click, key, touch) */
+  /** Create/resume AudioContext on first user gesture and start decoding */
   private installUnlockListener(): void {
     const unlock = () => {
       this.ensureContext();
+      this.decodeAll();
       document.removeEventListener('click', unlock);
       document.removeEventListener('keydown', unlock);
       document.removeEventListener('touchstart', unlock);
