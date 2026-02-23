@@ -1,5 +1,5 @@
 #logo-splash {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 200;
   background: url('/textures/logo.jpg') center / cover no-repeat;

@@ -5,7 +5,7 @@ export class MainMenu {
   private onPlay: () => void;
   private keyHandler: (e: KeyboardEvent) => void;
 
-  constructor(onPlay: () => void) {
+  constructor(parent: HTMLElement, onPlay: () => void) {
     this.onPlay = onPlay;
 
     this.root = document.createElement('div');
@@ -18,7 +18,7 @@ export class MainMenu {
     playBtn.addEventListener('click', () => this.play());
     this.root.appendChild(playBtn);
 
-    document.body.appendChild(this.root);
+    parent.appendChild(this.root);
 
     this.keyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {

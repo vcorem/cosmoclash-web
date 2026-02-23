@@ -7,12 +7,12 @@ export class LogoSplash {
   private skipHandler: () => void;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
-  constructor(onComplete: () => void) {
+  constructor(parent: HTMLElement, onComplete: () => void) {
     this.onComplete = onComplete;
 
     this.root = document.createElement('div');
     this.root.id = 'logo-splash';
-    document.body.appendChild(this.root);
+    parent.appendChild(this.root);
 
     this.skipHandler = () => this.finish();
     window.addEventListener('keydown', this.skipHandler);

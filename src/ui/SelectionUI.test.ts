@@ -5,7 +5,7 @@ describe('SelectionUI', () => {
   let ui: SelectionUI;
 
   beforeEach(() => {
-    ui = new SelectionUI();
+    ui = new SelectionUI(document.body);
   });
 
   afterEach(() => {

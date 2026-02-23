@@ -27,23 +27,30 @@ import { SelectionUI } from '@/ui/SelectionUI';
 import { CharacterDef } from '@/game/CharacterRegistry';
 import { LogoSplash } from '@/ui/LogoSplash';
 import { MainMenu } from '@/ui/MainMenu';
+import { Viewport } from '@/ui/Viewport';
 import '@/ui/hud.css';
+
+// Viewport container — maintains 4:3 aspect ratio with letterboxing
+const viewport = new Viewport();
+const container = viewport.container;
 
 // Setup Three.js — melee scene (persistent across rounds)
 const scene = createScene();
 const camera = createCamera();
-const renderer = createRenderer();
+const renderer = createRenderer(container);
 const stars = createStarField();
 scene.add(stars);
 
 // Resize handling
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const w = viewport.width;
+  const h = viewport.height;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
   // Also resize selection camera if active
   if (selectionScene) {
-    selectionScene.camera.aspect = window.innerWidth / window.innerHeight;
+    selectionScene.camera.aspect = w / h;
     selectionScene.camera.updateProjectionMatrix();
   }
 });
@@ -429,7 +436,7 @@ const GAME_OVER_DELAY_MS = 1500;
 let mainMenu: MainMenu | null = null;
 
 function showMainMenu(): void {
-  mainMenu = new MainMenu(() => {
+  mainMenu = new MainMenu(container, () => {
     mainMenu!.destroy();
     mainMenu = null;
     showSelectionScreen();
@@ -439,13 +446,13 @@ function showMainMenu(): void {
 
 function showSelectionScreen(): void {
   selectionScene = new SelectionScene();
-  selectionUI = new SelectionUI();
+  selectionUI = new SelectionUI(container);
   selectionUI.show(2, selectionScene.getCurrentCharacter());
   gameState = 'selection';
 }
 
 // Logo splash → main menu
-new LogoSplash(() => showMainMenu());
+new LogoSplash(container, () => showMainMenu());
 
 // Selection screen state
 let selectionScene: SelectionScene | null = null;
@@ -541,7 +548,7 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   if (asteroidModelsLoaded === 3) spawnAsteroids();
 
   // Show melee HUD
-  hud = new HUD();
+  hud = new HUD(container);
 
   // Reset camera zoom
   cameraController.reset(camera);

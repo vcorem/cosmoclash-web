@@ -3,6 +3,7 @@ import './selection.css';
 
 export class SelectionUI {
   private root: HTMLDivElement;
+  private parent: HTMLElement;
   private header: HTMLDivElement;
   private nameEl: HTMLDivElement;
   private weaponLabel: HTMLSpanElement;
@@ -10,7 +11,7 @@ export class SelectionUI {
   private specialLabel: HTMLSpanElement;
   private specialValue: Text;
 
-  constructor() {
+  constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
     this.root.id = 'selection-ui';
     this.root.style.display = 'none';
@@ -53,7 +54,8 @@ export class SelectionUI {
 
     this.root.appendChild(this.header);
     this.root.appendChild(panel);
-    document.body.appendChild(this.root);
+    this.parent = parent;
+    parent.appendChild(this.root);
   }
 
   show(playerNum: number, character: CharacterDef): void {

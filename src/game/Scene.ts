@@ -83,10 +83,10 @@ export function createStarField(): THREE.Points {
   return stars;
 }
 
-export function createRenderer(): THREE.WebGLRenderer {
+export function createRenderer(parent: HTMLElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(parent.clientWidth, parent.clientHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
-  document.body.appendChild(renderer.domElement);
+  parent.appendChild(renderer.domElement);
   return renderer;
 }

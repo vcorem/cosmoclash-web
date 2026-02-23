@@ -41,7 +41,7 @@ export class HUD {
   private healthColors: string[] = [];
   private energyColors: string[] = [];
 
-  constructor() {
+  constructor(parent: HTMLElement) {
     // Pre-compute gradient colors
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       const hc = computeSegmentColor(i, HEALTH_COLOR_FULL, HEALTH_COLOR_EMPTY);
@@ -74,7 +74,7 @@ export class HUD {
     this.overlay.appendChild(this.restartText);
 
     this.root.appendChild(this.overlay);
-    document.body.appendChild(this.root);
+    parent.appendChild(this.root);
   }
 
   private createPanel(
