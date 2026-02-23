@@ -35,6 +35,7 @@ function makeTable(overrides: Partial<PlayerTable> = {}): PlayerTable {
     shots: [],
     snots: [],
     snotCount: 0,
+    VVAngle: 0,
     ...overrides,
   };
 }

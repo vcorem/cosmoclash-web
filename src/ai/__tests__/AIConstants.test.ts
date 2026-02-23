@@ -1,5 +1,5 @@
 // src/ai/__tests__/AIConstants.test.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   getDifficultyConstants,
   DifficultyLevel,

@@ -24,10 +24,13 @@ import { Asteroid } from '@/game/Asteroid';
 import { HUD } from '@/ui/HUD';
 import { SelectionScene, SelectionState } from '@/game/SelectionScene';
 import { SelectionUI } from '@/ui/SelectionUI';
-import { CharacterDef } from '@/game/CharacterRegistry';
+import { CharacterDef, CHARACTER_REGISTRY } from '@/game/CharacterRegistry';
 import { LogoSplash } from '@/ui/LogoSplash';
 import { MainMenu } from '@/ui/MainMenu';
+import { DifficultyUI } from '@/ui/DifficultyUI';
 import { Viewport } from '@/ui/Viewport';
+import { AIController } from '@/ai/AIController';
+import { DifficultyLevel } from '@/ai/AIConstants';
 import '@/ui/hud.css';
 
 // Viewport container — maintains 4:3 aspect ratio with letterboxing
@@ -425,8 +428,12 @@ const cameraController = new CameraController();
 // HUD overlay — created when entering melee, destroyed on return to selection
 let hud: HUD | null = null;
 
+// AI controller — drives Player 2 when playing against computer
+let aiController: AIController | null = null;
+let aiDifficulty: DifficultyLevel = 3;
+
 // Game state — starts with logo splash
-type GameState = 'logo' | 'menu' | 'selection' | 'playing' | 'gameOver';
+type GameState = 'logo' | 'menu' | 'difficulty' | 'selection' | 'playing' | 'gameOver';
 let gameState: GameState = 'logo';
 let winnerNum: 1 | 2 = 1;
 let gameOverDelay = 0;
@@ -434,20 +441,33 @@ const GAME_OVER_DELAY_MS = 1500;
 
 // Menu state
 let mainMenu: MainMenu | null = null;
+let difficultyUI: DifficultyUI | null = null;
 
 function showMainMenu(): void {
   mainMenu = new MainMenu(container, () => {
     mainMenu!.destroy();
     mainMenu = null;
-    showSelectionScreen();
+    showDifficultyScreen();
   });
   gameState = 'menu';
 }
 
+function showDifficultyScreen(): void {
+  difficultyUI = new DifficultyUI(container, (level) => {
+    aiDifficulty = level;
+    difficultyUI!.destroy();
+    difficultyUI = null;
+    showSelectionScreen();
+  });
+  gameState = 'difficulty';
+}
+
 function showSelectionScreen(): void {
   selectionScene = new SelectionScene();
+  // Start at P1 selection directly (P2 is AI-controlled, randomly assigned)
+  selectionScene.state = SelectionState.SELECTING_P1;
   selectionUI = new SelectionUI(container);
-  selectionUI.show(2, selectionScene.getCurrentCharacter());
+  selectionUI.show(1, selectionScene.getCurrentCharacter());
   gameState = 'selection';
 }
 
@@ -547,6 +567,9 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   asteroidMeshMap.clear();
   if (asteroidModelsLoaded === 3) spawnAsteroids();
 
+  // Create AI controller for Player 2
+  aiController = new AIController(aiDifficulty, p2Def, p1Def);
+
   // Show melee HUD
   hud = new HUD(container);
 
@@ -559,35 +582,30 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
 // ----- Selection screen keyboard handler -----
 
 window.addEventListener('keydown', (e) => {
+  if (gameState === 'difficulty' && difficultyUI) {
+    difficultyUI.handleKey(e.key);
+    return;
+  }
+
   if (gameState !== 'selection' || !selectionScene || !selectionUI) return;
   if (selectionScene.state === SelectionState.DONE) return;
 
   switch (e.key) {
     case 'ArrowLeft':
       selectionScene.selectPrev();
-      selectionUI.show(
-        selectionScene.state === SelectionState.SELECTING_P2 ? 2 : 1,
-        selectionScene.getCurrentCharacter(),
-      );
+      selectionUI.show(1, selectionScene.getCurrentCharacter());
       break;
     case 'ArrowRight':
       selectionScene.selectNext();
-      selectionUI.show(
-        selectionScene.state === SelectionState.SELECTING_P2 ? 2 : 1,
-        selectionScene.getCurrentCharacter(),
-      );
+      selectionUI.show(1, selectionScene.getCurrentCharacter());
       break;
     case 'Enter': {
-      selectionScene.confirmSelection();
-      // Read state after mutation; cast needed because TS narrows from the DONE guard above
-      const newState = selectionScene.state as SelectionState;
-      if (newState === SelectionState.SELECTING_P1) {
-        selectionUI.show(1, selectionScene.getCurrentCharacter());
-      } else if (newState === SelectionState.DONE) {
-        selectionUI.hide();
-        const { p1Def, p2Def } = selectionScene.getSelections();
-        startMelee(p1Def, p2Def);
-      }
+      // P1 confirms — assign random P2 and start
+      const p1Def = selectionScene.getCurrentCharacter();
+      const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
+      const p2Def = CHARACTER_REGISTRY[p2Index];
+      selectionUI.hide();
+      startMelee(p1Def, p2Def);
       break;
     }
   }
@@ -740,7 +758,7 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
-    if (gameState === 'logo' || gameState === 'menu') {
+    if (gameState === 'logo' || gameState === 'menu' || gameState === 'difficulty') {
       return; // HTML overlays handle these states
     }
 
@@ -767,7 +785,12 @@ const gameLoop = new GameLoop(
 
       // Process input for both players
       updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
-      updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
+      if (aiController) {
+        const aiInput = aiController.update(dt, player2, player1, bulletPool, snotPool);
+        updatePlayerInput(player2, player1, aiInput, thrustEffect2, dt);
+      } else {
+        updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
+      }
 
       if (player1 instanceof MichiGichiPlayer) {
         player1.updateMorph(dt);
@@ -966,7 +989,7 @@ const gameLoop = new GameLoop(
   },
   () => {
     // Render: switch scene based on game state
-    if (gameState === 'logo' || gameState === 'menu') {
+    if (gameState === 'logo' || gameState === 'menu' || gameState === 'difficulty') {
       renderer.clear();
     } else if (gameState === 'selection' && selectionScene) {
       renderer.render(selectionScene.scene, selectionScene.camera);

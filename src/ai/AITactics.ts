@@ -752,8 +752,8 @@ export function turnAndShoot(
           const toAngle = goodAim(computer, user, ctx.constants.goodAimProbability);
           turnToAngle(computer, toAngle, out);
           if (Math.abs(computer.angle - toAngle) < 5 &&
-              MGstate !== MorphState.GICHI_TO_MICHI &&
-              MGstate !== MorphState.MICHI_TO_GICHI) {
+              computer.morphState !== MorphState.GICHI_TO_MICHI &&
+              computer.morphState !== MorphState.MICHI_TO_GICHI) {
             if (realIsInRange(computer, user)) {
               out.setFirePrimary(true);
             } else {
