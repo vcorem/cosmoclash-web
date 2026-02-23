@@ -44,20 +44,27 @@ export class CameraController {
     p1x: number, p1y: number,
     p2x: number, p2y: number,
     dt: number,
+    immediate: boolean = false,
   ): void {
     // Midpoint between players
     const midX = (p1x + p2x) / 2;
     const midY = (p1y + p2y) / 2;
 
-    // Smooth camera position toward midpoint
-    const dx = midX - camera.position.x;
-    const dy = midY - camera.position.y;
-    const distToCam = Math.sqrt(dx * dx + dy * dy);
+    if (immediate) {
+      // Snap camera XY to midpoint (skip smooth lerp) — used after player wrap
+      camera.position.x = midX;
+      camera.position.y = midY;
+    } else {
+      // Smooth camera position toward midpoint
+      const dx = midX - camera.position.x;
+      const dy = midY - camera.position.y;
+      const distToCam = Math.sqrt(dx * dx + dy * dy);
 
-    if (distToCam > 0.01) {
-      const moveLen = Math.min(dt * distToCam * 0.005, distToCam);
-      camera.position.x += (dx / distToCam) * moveLen;
-      camera.position.y += (dy / distToCam) * moveLen;
+      if (distToCam > 0.01) {
+        const moveLen = Math.min(dt * distToCam * 0.005, distToCam);
+        camera.position.x += (dx / distToCam) * moveLen;
+        camera.position.y += (dy / distToCam) * moveLen;
+      }
     }
 
     // Player separation distance (2D)

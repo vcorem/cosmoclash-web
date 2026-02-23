@@ -14,9 +14,9 @@ describe('Sun', () => {
     expect(sun.position).toEqual(ARENA.SUN_POSITION);
   });
 
-  it('has autoWrap disabled', () => {
+  it('has autoWrap enabled (wraps relative to camera like all entities)', () => {
     const sun = new Sun();
-    expect(sun.autoWrap).toBe(false);
+    expect(sun.autoWrap).toBe(true);
   });
 
   it('has collision sphere with correct radius', () => {

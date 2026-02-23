@@ -799,6 +799,73 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
   mesh.quaternion.copy(rollQ.multiply(headingQ));
 }
 
+/**
+ * Player wrap-around: teleports the farther player when distance between
+ * players exceeds arena bounds. Matches C++ CSceneMelee::HandleWrapAround.
+ * Returns true if a wrap occurred (camera should snap).
+ */
+function handlePlayerWrapAround(p1: Player, p2: Player): boolean {
+  const p1Pos = p1.position;
+  const p2Pos = p2.position;
+  const dx = p2Pos.x - p1Pos.x;
+  const dy = p2Pos.y - p1Pos.y;
+
+  let swapped = false;
+
+  // Who is farther from world origin on each axis?
+  const p2XisFarther = p2Pos.x * p2Pos.x > p1Pos.x * p1Pos.x;
+  const p2YisFarther = p2Pos.y * p2Pos.y > p1Pos.y * p1Pos.y;
+
+  // X-axis: too far apart
+  if (dx > ARENA.WRAP_X) {
+    if (p2XisFarther) {
+      p2Pos.x = p1Pos.x - ARENA.WRAP_X;
+    } else {
+      p1Pos.x = p2Pos.x + ARENA.WRAP_X;
+    }
+    swapped = true;
+  } else if (dx < -ARENA.WRAP_X) {
+    if (p2XisFarther) {
+      p2Pos.x = p1Pos.x + ARENA.WRAP_X;
+    } else {
+      p1Pos.x = p2Pos.x - ARENA.WRAP_X;
+    }
+    swapped = true;
+  }
+
+  // Y-axis: too far apart
+  if (dy > ARENA.WRAP_Y) {
+    if (p2YisFarther) {
+      p2Pos.y = p1Pos.y - ARENA.WRAP_Y;
+    } else {
+      p1Pos.y = p2Pos.y + ARENA.WRAP_Y;
+    }
+    swapped = true;
+  } else if (dy < -ARENA.WRAP_Y) {
+    if (p2YisFarther) {
+      p2Pos.y = p1Pos.y + ARENA.WRAP_Y;
+    } else {
+      p1Pos.y = p2Pos.y - ARENA.WRAP_Y;
+    }
+    swapped = true;
+  }
+
+  if (swapped) {
+    // Simulate 400ms of forward movement to avoid dangling at wrap boundary
+    const t400 = 400 * ARENA.TIME_SCALER;
+    p1.position.x += p1.accelVec.x * t400;
+    p1.position.y += p1.accelVec.y * t400;
+    p2.position.x += p2.accelVec.x * t400;
+    p2.position.y += p2.accelVec.y * t400;
+
+    // Reset previous positions to prevent sweep collision across the wrap teleport
+    p1.previousPosition = { ...p1.position };
+    p2.previousPosition = { ...p2.position };
+  }
+
+  return swapped;
+}
+
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
@@ -815,6 +882,7 @@ const gameLoop = new GameLoop(
     }
 
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+    let playerWrapped = false;
 
     if (gameState === 'playing') {
       // Collision detection FIRST (matches original C++ loop order)
@@ -865,8 +933,11 @@ const gameLoop = new GameLoop(
       });
 
       // Sun gravity — applied to players only (matches original C++)
-      applySunGravity(player1, ARENA.SUN_POSITION, dt);
-      applySunGravity(player2, ARENA.SUN_POSITION, dt);
+      applySunGravity(player1, sun.position, dt);
+      applySunGravity(player2, sun.position, dt);
+
+      // Player wrap-around: distance between players (matches C++ HandleWrapAround)
+      playerWrapped = handlePlayerWrapAround(player1, player2);
 
       // Winner detection
       if (!player1.alive || !player2.alive) {
@@ -895,19 +966,23 @@ const gameLoop = new GameLoop(
 
     // --- Always runs during playing/gameOver ---
 
-    // Sun animation
+    // Sun animation + visual sync (sun wraps like all entities)
     sun.updateAnimation(dt);
     const frameIndex = Math.floor(sun.currentFrame);
     const col = frameIndex % SUN_ATLAS_COLS;
     const row = Math.floor(frameIndex / SUN_ATLAS_COLS);
     sunTexture.offset.set(col / SUN_ATLAS_COLS, 1 - (row + 1) / SUN_ATLAS_ROWS);
+    sunMesh.position.set(sun.position.x, sun.position.y, sun.position.z);
+    sunGlow.position.set(sun.position.x, sun.position.y, sun.position.z);
+    sunLight.position.set(sun.position.x, sun.position.y, sun.position.z);
 
-    // Update camera to track both players
+    // Update camera to track both players (snap immediately after wrap)
     cameraController.update(
       camera,
       player1.position.x, player1.position.y,
       player2.position.x, player2.position.y,
       dt,
+      playerWrapped,
     );
 
     // Sync meshes

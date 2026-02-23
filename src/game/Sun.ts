@@ -10,7 +10,7 @@ export class Sun extends Entity {
   constructor() {
     super();
     this.entityType = EntityType.Sun;
-    this.autoWrap = false;
+    this.autoWrap = true;
     this.position = { ...ARENA.SUN_POSITION };
     this.previousPosition = { ...ARENA.SUN_POSITION };
     this.collisionSpheres = [

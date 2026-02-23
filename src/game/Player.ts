@@ -39,6 +39,7 @@ export class Player extends Entity {
     super();
     this.stats = stats;
     this.entityType = EntityType.Player;
+    this.autoWrap = false; // Players use dedicated player-to-player wrap, not camera-distance wrap
     this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: 14 }];
   }
 
