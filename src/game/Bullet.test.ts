@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Bullet, FLAME_BULLET_CONFIG } from './Bullet';
+import { Bullet, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG } from './Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
 
 describe('Bullet', () => {
@@ -9,6 +9,27 @@ describe('Bullet', () => {
       expect(FLAME_BULLET_CONFIG.maxTtl).toBe(700);
       expect(FLAME_BULLET_CONFIG.damage).toBe(0.05);
       expect(FLAME_BULLET_CONFIG.collisionRadius).toBe(10);
+    });
+  });
+
+  describe('PLASMA_BULLET_CONFIG', () => {
+    it('has correct plasma values', () => {
+      expect(PLASMA_BULLET_CONFIG.speedMaxScaler).toBe(0.3);
+      expect(PLASMA_BULLET_CONFIG.maxTtl).toBe(10000);
+      expect(PLASMA_BULLET_CONFIG.damage).toBe(0.3);
+      expect(PLASMA_BULLET_CONFIG.collisionRadius).toBe(0);
+      expect(PLASMA_BULLET_CONFIG.tracking).toBe(true);
+      expect(PLASMA_BULLET_CONFIG.expandingRadius).toEqual({ min: 0, max: 70 });
+      expect(PLASMA_BULLET_CONFIG.decayingDamage).toEqual({ initial: 0.3 });
+    });
+  });
+
+  describe('SUN_BULLET_CONFIG', () => {
+    it('has correct sun bullet values', () => {
+      expect(SUN_BULLET_CONFIG.speedMaxScaler).toBe(1.5);
+      expect(SUN_BULLET_CONFIG.maxTtl).toBe(1000);
+      expect(SUN_BULLET_CONFIG.damage).toBe(0.1);
+      expect(SUN_BULLET_CONFIG.collisionRadius).toBe(2);
     });
   });
 
@@ -76,6 +97,62 @@ describe('Bullet', () => {
       expect(b.collisionSpheres).toHaveLength(1);
       expect(b.collisionSpheres[0].offset).toEqual({ x: 0, y: 0, z: 0 });
       expect(b.collisionSpheres[0].radius).toBe(10);
+    });
+  });
+
+  describe('dynamic update behaviors', () => {
+    describe('expanding collision radius', () => {
+      it('expands collision sphere from min to max over TTL', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        expect(b.collisionSpheres[0].radius).toBe(0);
+        b.update(5000);
+        expect(b.collisionSpheres[0].radius).toBeCloseTo(35);
+      });
+
+      it('reaches max radius at end of TTL', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        b.update(9999);
+        expect(b.collisionSpheres[0].radius).toBeCloseTo(70, 0);
+      });
+    });
+
+    describe('decaying damage', () => {
+      it('starts at initial damage', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        expect(b.getCurrentDamage()).toBeCloseTo(0.3);
+      });
+
+      it('decays linearly to zero over TTL', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        b.update(5000);
+        expect(b.getCurrentDamage()).toBeCloseTo(0.15);
+      });
+
+      it('returns zero when TTL expired', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        b.update(10000);
+        expect(b.getCurrentDamage()).toBe(0);
+      });
+    });
+
+    describe('tracking', () => {
+      it('steers toward target entity each update', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        const target = new Entity();
+        target.position = { x: 100, y: 0, z: 0 };
+        b.trackingTarget = target;
+        b.position = { x: 0, y: 0, z: 0 };
+        b.accelVec = { x: 0, y: 0.3, z: 0 };
+        b.update(100);
+        expect(b.accelVec.x).toBeGreaterThan(0);
+      });
+
+      it('does not track when target is null', () => {
+        const b = new Bullet(PLASMA_BULLET_CONFIG);
+        b.accelVec = { x: 0, y: 0.3, z: 0 };
+        b.update(100);
+        expect(b.accelVec.x).toBeCloseTo(0);
+      });
     });
   });
 });
