@@ -5,7 +5,7 @@ import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
 import { ARENA } from '@/game/Arena';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG } from '@/game/Bullet';
-import { Entity } from '@/engine/Entity';
+import { Entity, EntityType } from '@/engine/Entity';
 import { EntityPool } from '@/engine/EntityPool';
 import { InputManager, PlayerInput } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
@@ -234,7 +234,7 @@ const explosionPool = new EntityPool<Explosion>(
 );
 const explosionSpriteMap = new Map<Explosion, THREE.Sprite>();
 
-function spawnExplosion(x: number, y: number, z: number): void {
+function spawnExplosion(x: number, y: number, z: number, entityType: EntityType): void {
   const expl = explosionPool.acquire();
   expl.position = { x, y, z };
   expl.previousPosition = { x, y, z };
@@ -250,10 +250,13 @@ function spawnExplosion(x: number, y: number, z: number): void {
     mat.map!.wrapS = THREE.RepeatWrapping;
     mat.map!.wrapT = THREE.RepeatWrapping;
     const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(ARENA.EXPLOSION_BILLBOARD_SIZE, ARENA.EXPLOSION_BILLBOARD_SIZE, 1);
     explosionSpriteMap.set(expl, sprite);
   }
   const sprite = explosionSpriteMap.get(expl)!;
+  const size = entityType === EntityType.Asteroid
+    ? ARENA.EXPLOSION_ASTEROID_BILLBOARD_SIZE
+    : ARENA.EXPLOSION_BILLBOARD_SIZE;
+  sprite.scale.set(size, size, 1);
   sprite.visible = true;
   scene.add(sprite);
 }
@@ -282,6 +285,14 @@ function loadAsteroidModels(onAllLoaded: () => void): void {
           ARENA.ASTEROID_MESH_SCALE,
           ARENA.ASTEROID_MESH_SCALE,
         );
+        // Fix materials converted from Irrlicht Blinn-Phong to Three.js PBR:
+        // Original models have emissiveFactor 0.7 which washes out textures in PBR
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+            mat.emissive.set(0, 0, 0);
+          }
+        });
         asteroidModels[i] = model;
         asteroidModelsLoaded++;
         if (asteroidModelsLoaded === 3) onAllLoaded();
@@ -350,7 +361,7 @@ const explosionListener: GameEventListener = {
   onGameEvent(event: GameEvent) {
     if (event.type === GameEventType.Explosion) {
       const e = (event as ExplosionEvent).entity;
-      spawnExplosion(e.position.x, e.position.y, e.position.z);
+      spawnExplosion(e.position.x, e.position.y, e.position.z, e.entityType);
     }
   },
 };
@@ -498,17 +509,7 @@ const gameLoop = new GameLoop(
     applySunGravity(player1, ARENA.SUN_POSITION, dt);
     applySunGravity(player2, ARENA.SUN_POSITION, dt);
 
-    // Sun gravity on snots in flight
-    snotPool.forEachActive((snot) => {
-      if (!snot.attached) {
-        applySunGravity(snot, ARENA.SUN_POSITION, dt);
-      }
-    });
-
-    // Sun gravity on asteroids
-    asteroidPool.forEachActive((asteroid) => {
-      applySunGravity(asteroid, ARENA.SUN_POSITION, dt);
-    });
+    // No sun gravity on snots or asteroids (matches original C++ — gravity is players only)
 
     // Sun animation
     sun.updateAnimation(dt);

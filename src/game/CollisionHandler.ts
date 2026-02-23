@@ -61,28 +61,49 @@ export class CollisionHandler implements GameEventListener {
       a.entityType === EntityType.Asteroid ||
       b.entityType === EntityType.Asteroid;
 
-    if (!hasAsteroid) {
-      // --- Damage based on relative velocity ---
-      const rvx = a.accelVec.x - b.accelVec.x;
-      const rvy = a.accelVec.y - b.accelVec.y;
-      const rvz = a.accelVec.z - b.accelVec.z;
-      const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
-      const damage = Math.min(relSpeed * COLLISION_DAMAGE_SCALE, 0.3);
-
-      a.health -= damage;
-      b.health -= damage;
-
-      if (a.health <= 0) {
-        a.destroy();
-        if (a.entityType === EntityType.Player) {
-          GameEventMgr.getInstance().sendEvent(new ExplosionEvent(a));
-        }
+    if (hasAsteroid) {
+      // Simple velocity redirect matching original C++ CEntity::HandleCollision:
+      // Just redirect accelVec to point away from collision partner, preserving speed.
+      // No position push, no margin — the original doesn't do any of that.
+      let nx = b.position.x - a.position.x;
+      let ny = b.position.y - a.position.y;
+      const dist = Math.sqrt(nx * nx + ny * ny);
+      if (dist > 0.001) {
+        nx /= dist;
+        ny /= dist;
+      } else {
+        nx = 1; ny = 0;
       }
-      if (b.health <= 0) {
-        b.destroy();
-        if (b.entityType === EntityType.Player) {
-          GameEventMgr.getInstance().sendEvent(new ExplosionEvent(b));
-        }
+
+      const aSpeed = Math.sqrt(a.accelVec.x * a.accelVec.x + a.accelVec.y * a.accelVec.y);
+      const bSpeed = Math.sqrt(b.accelVec.x * b.accelVec.x + b.accelVec.y * b.accelVec.y);
+      // A deflects away from B
+      a.accelVec = { x: -nx * aSpeed, y: -ny * aSpeed, z: 0 };
+      // B deflects away from A
+      b.accelVec = { x: nx * bSpeed, y: ny * bSpeed, z: 0 };
+      return;
+    }
+
+    // --- Player-player: Damage based on relative velocity ---
+    const rvx = a.accelVec.x - b.accelVec.x;
+    const rvy = a.accelVec.y - b.accelVec.y;
+    const rvz = a.accelVec.z - b.accelVec.z;
+    const relSpeed = Math.sqrt(rvx * rvx + rvy * rvy + rvz * rvz);
+    const damage = Math.min(relSpeed * COLLISION_DAMAGE_SCALE, 0.3);
+
+    a.health -= damage;
+    b.health -= damage;
+
+    if (a.health <= 0) {
+      a.destroy();
+      if (a.entityType === EntityType.Player) {
+        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(a));
+      }
+    }
+    if (b.health <= 0) {
+      b.destroy();
+      if (b.entityType === EntityType.Player) {
+        GameEventMgr.getInstance().sendEvent(new ExplosionEvent(b));
       }
     }
 
