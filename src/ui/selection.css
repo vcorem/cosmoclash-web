@@ -1,0 +1,51 @@
+#selection-ui {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  text-align: center;
+  color: #fff;
+}
+
+.selection-header {
+  font-size: 22px;
+  margin-bottom: 12px;
+  text-shadow: 0 0 8px rgba(100, 150, 255, 0.8);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.selection-info-panel {
+  background: rgba(0, 0, 20, 0.75);
+  border: 1px solid rgba(100, 150, 255, 0.4);
+  border-radius: 8px;
+  padding: 14px 28px;
+  min-width: 320px;
+}
+
+.selection-ship-name {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  text-shadow: 0 0 10px rgba(100, 200, 255, 0.6);
+}
+
+.selection-row {
+  font-size: 15px;
+  margin: 4px 0;
+  color: #bbc;
+}
+
+.selection-row .label {
+  color: #88a;
+  margin-right: 6px;
+}
+
+.selection-controls {
+  font-size: 13px;
+  margin-top: 14px;
+  color: #667;
+}
