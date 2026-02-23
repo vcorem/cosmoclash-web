@@ -19,7 +19,9 @@ export class Sun extends Entity {
   }
 
   override update(_dt: number): void {
-    // Sun is fixed — no movement
+    // Sun is fixed — no movement, but keep previousPosition in sync
+    // so sweep-sphere collision never sees a stale previous position.
+    this.previousPosition = { ...this.position };
   }
 
   updateAnimation(dt: number): void {

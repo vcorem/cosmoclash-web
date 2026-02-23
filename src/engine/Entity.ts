@@ -57,21 +57,32 @@ export class Entity {
 
     const dx = this.position.x - camCenter.x;
     const dy = this.position.y - camCenter.y;
+    let wrapped = false;
 
     if (dx > ARENA.WRAP_X) {
       const overshoot = dx - ARENA.WRAP_X;
       this.position.x = camCenter.x - ARENA.WRAP_X + overshoot;
+      wrapped = true;
     } else if (dx < -ARENA.WRAP_X) {
       const overshoot = dx + ARENA.WRAP_X;
       this.position.x = camCenter.x + ARENA.WRAP_X + overshoot;
+      wrapped = true;
     }
 
     if (dy > ARENA.WRAP_Y) {
       const overshoot = dy - ARENA.WRAP_Y;
       this.position.y = camCenter.y - ARENA.WRAP_Y + overshoot;
+      wrapped = true;
     } else if (dy < -ARENA.WRAP_Y) {
       const overshoot = dy + ARENA.WRAP_Y;
       this.position.y = camCenter.y + ARENA.WRAP_Y + overshoot;
+      wrapped = true;
+    }
+
+    // Reset previous position to prevent sweep collision across the wrap teleport.
+    // Matches C++ ResetBoundingSpheres() / m_bFirstBoundCheck behavior.
+    if (wrapped) {
+      this.previousPosition = { ...this.position };
     }
   }
 
