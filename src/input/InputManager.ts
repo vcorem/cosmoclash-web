@@ -60,6 +60,12 @@ export class InputManager {
 
     this.onKeyUp = (e: KeyboardEvent) => {
       this.pressed.delete(e.key);
+      // Shift modifier changes key case: releasing 'd' while Shift is held
+      // reports 'D', leaving lowercase 'd' stuck. Delete both cases.
+      if (e.key.length === 1) {
+        this.pressed.delete(e.key.toLowerCase());
+        this.pressed.delete(e.key.toUpperCase());
+      }
     };
 
     window.addEventListener('keydown', this.onKeyDown);

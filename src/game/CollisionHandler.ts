@@ -32,14 +32,6 @@ export class CollisionHandler implements GameEventListener {
     const bullet = event.bullet as Bullet;
     const target = event.target;
 
-    // Plasma-plasma interaction: reduce TTL by 100ms instead of destroying
-    if (target.entityType === EntityType.Bullet) {
-      const targetBullet = target as Bullet;
-      targetBullet.ttl -= 100;
-      bullet.ttl -= 100;
-      return; // Don't destroy either bullet
-    }
-
     // Sun is indestructible — bullets die on contact but deal no damage
     if (target.entityType === EntityType.Sun) {
       // no damage

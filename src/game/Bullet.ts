@@ -39,6 +39,8 @@ export class Bullet extends Entity {
   originEntity: Entity | null;
   ttl: number;
   trackingTarget: Entity | null = null;
+  animFrame: number = 0;
+  animSpeed: number = 0;
 
   constructor(config: BulletConfig, originEntity: Entity | null = null) {
     super();
@@ -60,6 +62,8 @@ export class Bullet extends Entity {
     this.angle = 0;
     this.health = 1;
     this.trackingTarget = null;
+    this.animFrame = 0;
+    this.animSpeed = 0;
     this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: config.collisionRadius }];
   }
 

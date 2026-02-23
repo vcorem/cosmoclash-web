@@ -526,26 +526,6 @@ describe('CollisionHandler', () => {
     });
   });
 
-  describe('plasma-plasma interaction', () => {
-    it('reduces TTL of both bullets by 100ms instead of destroying', () => {
-      const shooter1 = new Entity();
-      const shooter2 = new Entity();
-      const bullet1 = new Bullet(PLASMA_BULLET_CONFIG, shooter1);
-      const bullet2 = new Bullet(PLASMA_BULLET_CONFIG, shooter2);
-
-      const initialTtl1 = bullet1.ttl;
-      const initialTtl2 = bullet2.ttl;
-
-      const event = new BulletHitEvent(bullet1, bullet2);
-      handler.onGameEvent(event);
-
-      expect(bullet1.ttl).toBe(initialTtl1 - 100);
-      expect(bullet2.ttl).toBe(initialTtl2 - 100);
-      expect(bullet1.alive).toBe(true);
-      expect(bullet2.alive).toBe(true);
-    });
-  });
-
   describe('sun collision', () => {
     it('applies SUN_DAMAGE to the non-sun entity', () => {
       const sun = new Entity();

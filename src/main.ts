@@ -102,7 +102,7 @@ loader.load(
     const container = new THREE.Group();
     const model = gltf.scene.clone();
     model.scale.set(2.0, 2.0, 2.0);
-    model.rotation.set(-90 * rad, 0, 0);
+    model.rotation.set(-90 * rad, Math.PI, 0);
     model.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
@@ -143,7 +143,10 @@ loadShipModel((mesh) => {
 
 // Load flame texture
 const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
-const plasmaTexture = new THREE.TextureLoader().load('/textures/plasma_atlas.png');
+let plasmaAtlasImage: HTMLImageElement | null = null;
+new THREE.TextureLoader().load('/textures/plasma_atlas.png', (tex) => {
+  plasmaAtlasImage = tex.image as HTMLImageElement;
+});
 const sunShotTexture = new THREE.TextureLoader().load('/textures/sun_shot.png');
 
 // Bullet pool with sprite management
@@ -161,6 +164,10 @@ function acquireBullet(config: BulletConfig, origin: Entity, target?: Entity): B
   if (config.tracking && target) {
     bullet.trackingTarget = target;
   }
+  if (config === PLASMA_BULLET_CONFIG) {
+    bullet.animFrame = 0;
+    bullet.animSpeed = 0.4;
+  }
 
   if (!bulletSpriteMap.has(bullet)) {
     const mat = new THREE.SpriteMaterial({
@@ -175,12 +182,15 @@ function acquireBullet(config: BulletConfig, origin: Entity, target?: Entity): B
   const sprite = bulletSpriteMap.get(bullet)!;
 
   const mat = sprite.material as THREE.SpriteMaterial;
-  if (config === PLASMA_BULLET_CONFIG) {
-    mat.map = plasmaTexture.clone();
-    mat.map.repeat.set(1 / 10, 1 / 8);
-    mat.map.wrapS = THREE.RepeatWrapping;
-    mat.map.wrapT = THREE.RepeatWrapping;
-    sprite.scale.set(20, 20, 1);
+  if (config === PLASMA_BULLET_CONFIG && plasmaAtlasImage) {
+    const tex = new THREE.Texture(plasmaAtlasImage);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.repeat.set(1 / 10, 1 / 8);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.needsUpdate = true;
+    mat.map = tex;
+    sprite.scale.set(50, 50, 1);
   } else if (config === SUN_BULLET_CONFIG) {
     mat.map = sunShotTexture;
     sprite.scale.set(10, 10, 1);
@@ -696,25 +706,27 @@ const gameLoop = new GameLoop(
       sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
 
       if (bullet.config === PLASMA_BULLET_CONFIG) {
+        // Advance animation: m_curTex += m_AnimSpeed * dt (matching C++ Render)
+        bullet.animFrame += bullet.animSpeed * dt;
+        if (bullet.animFrame > 41) {
+          bullet.animSpeed = 0.03; // slow loop after fade-in
+        }
+        if (bullet.animFrame > 79) {
+          bullet.animFrame = 41; // loop back to frame 41
+        }
+
+        // UV offset into 10x8 atlas
         const mat = sprite.material as THREE.SpriteMaterial;
         if (mat.map) {
-          const elapsed = bullet.config.maxTtl - bullet.ttl;
-          let frameIndex: number;
-          const fadeInDuration = 41 / 0.4;
-          if (elapsed < fadeInDuration * 42) {
-            frameIndex = Math.min(Math.floor(elapsed / (1000 / 0.4 / 42)), 41);
-          } else {
-            const loopElapsed = elapsed - fadeInDuration * 42;
-            const loopFrame = Math.floor(loopElapsed / (1000 / 0.03 / 39));
-            frameIndex = 41 + (loopFrame % 39);
-          }
-          frameIndex = Math.min(frameIndex, 79);
-          const col = frameIndex % 10;
-          const row = Math.floor(frameIndex / 10);
+          const fi = Math.min(Math.floor(bullet.animFrame), 79);
+          const col = fi % 10;
+          const row = Math.floor(fi / 10);
           mat.map.offset.set(col / 10, 1 - (row + 1) / 8);
         }
-        const age = (bullet.config.maxTtl - bullet.ttl) / bullet.config.maxTtl;
-        const size = 20 + age * 10;
+
+        // Billboard size: curScale = max(20, elapsed / 60) (C++ line 117-120)
+        const elapsed = bullet.config.maxTtl - bullet.ttl;
+        const size = Math.max(20, elapsed / 60.0);
         sprite.scale.set(size, size, 1);
       }
     });

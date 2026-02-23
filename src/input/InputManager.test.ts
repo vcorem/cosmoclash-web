@@ -125,6 +125,28 @@ describe('InputManager', () => {
     });
   });
 
+  describe('Shift + letter key case handling', () => {
+    it('clears lowercase key when released with Shift held (uppercase keyup)', () => {
+      // Press 'd' (lowercase, no Shift)
+      press('d');
+      expect(input.player(1).rotateRight).toBe(true);
+
+      // Release D while Shift changes it to uppercase 'D'
+      release('D');
+      expect(input.player(1).rotateRight).toBe(false);
+    });
+
+    it('clears uppercase key when released without Shift (lowercase keyup)', () => {
+      // Press 'D' (uppercase, Shift was held)
+      press('D');
+      expect(input.player(1).rotateRight).toBe(true);
+
+      // Release d after Shift released (lowercase keyup)
+      release('d');
+      expect(input.player(1).rotateRight).toBe(false);
+    });
+  });
+
   describe('destroy', () => {
     it('stops tracking keys after destroy', () => {
       press('ArrowUp');

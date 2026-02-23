@@ -104,13 +104,8 @@ export class CollisionDetector {
     const aIsSnot = a.entityType === EntityType.Snot;
     const bIsSnot = b.entityType === EntityType.Snot;
 
-    // Bullets don't collide with bullets (except plasma-plasma)
-    if (aIsBullet && bIsBullet) {
-      const aPlasma = (a as Bullet).config.tracking;
-      const bPlasma = (b as Bullet).config.tracking;
-      if (aPlasma && bPlasma) return true;
-      return false;
-    }
+    // Bullets don't collide with bullets (matches C++ CBullet::VerifyCollision)
+    if (aIsBullet && bIsBullet) return false;
 
     // Snots don't collide with snots or bullets
     if (aIsSnot && (bIsSnot || bIsBullet)) return false;
