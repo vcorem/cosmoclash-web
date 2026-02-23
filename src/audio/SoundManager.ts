@@ -24,6 +24,20 @@ export class SoundManager {
     this.muted = localStorage.getItem('cosmoclash-muted') === 'true';
     if (isNaN(this.masterVolume)) this.masterVolume = 1;
     this.masterVolume = Math.max(0, Math.min(1, this.masterVolume));
+    this.installUnlockListener();
+  }
+
+  /** Create/resume AudioContext on first user gesture (click, key, touch) */
+  private installUnlockListener(): void {
+    const unlock = () => {
+      this.ensureContext();
+      document.removeEventListener('click', unlock);
+      document.removeEventListener('keydown', unlock);
+      document.removeEventListener('touchstart', unlock);
+    };
+    document.addEventListener('click', unlock);
+    document.addEventListener('keydown', unlock);
+    document.addEventListener('touchstart', unlock);
   }
 
   static getInstance(): SoundManager {
