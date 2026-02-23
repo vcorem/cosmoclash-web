@@ -22,9 +22,12 @@ import { applySunGravity } from '@/game/Gravity';
 import { Snot, SNOT_CONFIG } from '@/game/Snot';
 import { Asteroid } from '@/game/Asteroid';
 import { HUD } from '@/ui/HUD';
+import { SelectionScene, SelectionState } from '@/game/SelectionScene';
+import { SelectionUI } from '@/ui/SelectionUI';
+import { CharacterDef } from '@/game/CharacterRegistry';
 import '@/ui/hud.css';
 
-// Setup Three.js
+// Setup Three.js — melee scene (persistent across rounds)
 const scene = createScene();
 const camera = createCamera();
 const renderer = createRenderer();
@@ -36,14 +39,19 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // Also resize selection camera if active
+  if (selectionScene) {
+    selectionScene.camera.aspect = window.innerWidth / window.innerHeight;
+    selectionScene.camera.updateProjectionMatrix();
+  }
 });
 
-// Create players
-const player1 = new MichiGichiPlayer();
+// Players — created dynamically based on character selection
+let player1: Player = new MichiGichiPlayer();
 player1.position = { ...ARENA.PLAYER1_SPAWN };
 player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
 
-const player2 = new Player(GONDI_STATS);
+let player2: Player = new Player(GONDI_STATS);
 player2.position = { ...ARENA.PLAYER2_SPAWN };
 player2.previousPosition = { ...ARENA.PLAYER2_SPAWN };
 
@@ -56,90 +64,68 @@ const _qRoll = new THREE.Quaternion();
 const _zAxis = new THREE.Vector3(0, 0, 1);
 const _fwd = new THREE.Vector3();
 
-// Load ship models
+// Shared loader
 const loader = new GLTFLoader();
 const rad = Math.PI / 180;
 
-function loadShipModel(
+// Player mesh state
+let p1Mesh: THREE.Object3D | null = null;
+let p2Mesh: THREE.Object3D | null = null;
+let p1Mixer: THREE.AnimationMixer | null = null;
+let p1AnimAction: THREE.AnimationAction | null = null;
+let p2Mixer: THREE.AnimationMixer | null = null;
+let p2AnimAction: THREE.AnimationAction | null = null;
+
+// Load a player model based on CharacterDef
+function loadPlayerModel(
+  charDef: CharacterDef,
   onLoaded: (mesh: THREE.Object3D) => void,
-  placeholderColor: number = 0x00ff88,
+  onMorphReady: ((mixer: THREE.AnimationMixer, action: THREE.AnimationAction) => void) | null,
 ): void {
   loader.load(
-    '/models/gondi.glb',
+    charDef.modelPath,
     (gltf) => {
       const container = new THREE.Group();
       const model = gltf.scene.clone();
-      model.scale.set(1.8, 1.8, 1.8);
-      model.rotation.set(0, 270 * rad, 90 * rad);
+      model.scale.set(charDef.modelScale, charDef.modelScale, charDef.modelScale);
+      model.rotation.set(
+        charDef.modelRotation[0] * rad,
+        charDef.modelRotation[1] * rad,
+        charDef.modelRotation[2] * rad,
+      );
+      model.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          if (mat.emissive) mat.emissive.set(0, 0, 0);
+        }
+      });
       container.add(model);
       scene.add(container);
+
+      if (onMorphReady && charDef.isMichiGichi && gltf.animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(model);
+        const clip = gltf.animations[0];
+        const action = mixer.clipAction(clip);
+        action.play();
+        action.paused = true;
+        onMorphReady(mixer, action);
+      }
+
       onLoaded(container);
     },
     undefined,
     () => {
-      console.warn('Could not load gondi.glb, using placeholder');
+      console.warn(`Could not load ${charDef.modelPath}, using placeholder`);
       const container = new THREE.Group();
       const geo = new THREE.ConeGeometry(8, 20, 8);
-      const mat = new THREE.MeshLambertMaterial({ color: placeholderColor });
+      const mat = new THREE.MeshLambertMaterial({ color: charDef.isMichiGichi ? 0xff8800 : 0x00ff88 });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.rotation.set(0, 270 * rad, 90 * rad);
       container.add(mesh);
       scene.add(container);
       onLoaded(container);
     },
   );
 }
-
-let p1Mesh: THREE.Object3D | null = null;
-let p2Mesh: THREE.Object3D | null = null;
-let p1Mixer: THREE.AnimationMixer | null = null;
-let p1AnimAction: THREE.AnimationAction | null = null;
-
-// Load MichiGichi model with animation for Player 1
-loader.load(
-  '/models/michiGichi.glb',
-  (gltf) => {
-    const container = new THREE.Group();
-    const model = gltf.scene.clone();
-    model.scale.set(2.0, 2.0, 2.0);
-    model.rotation.set(-90 * rad, Math.PI, 0);
-    model.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mat = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        if (mat.emissive) mat.emissive.set(0, 0, 0);
-      }
-    });
-    container.add(model);
-    scene.add(container);
-    p1Mesh = container;
-
-    if (gltf.animations.length > 0) {
-      p1Mixer = new THREE.AnimationMixer(model);
-      const clip = gltf.animations[0];
-      p1AnimAction = p1Mixer.clipAction(clip);
-      p1AnimAction.play();
-      p1AnimAction.paused = true;
-    }
-  },
-  undefined,
-  () => {
-    console.warn('Could not load michiGichi.glb, using placeholder');
-    const container = new THREE.Group();
-    const geo = new THREE.ConeGeometry(8, 20, 8);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xff8800 });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.set(0, 270 * rad, 90 * rad);
-    container.add(mesh);
-    scene.add(container);
-    p1Mesh = container;
-  },
-);
-
-// Load Gondi model for Player 2 (unchanged)
-loadShipModel((mesh) => {
-  p2Mesh = mesh;
-  mesh.position.set(player2.position.x, player2.position.y, 0);
-}, 0x00ff88);
 
 // Load flame texture
 const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
@@ -427,15 +413,20 @@ entityManager.add(sun);
 const input = new InputManager();
 const cameraController = new CameraController();
 
-// HUD overlay
-const hud = new HUD();
+// HUD overlay — created when entering melee, destroyed on return to selection
+let hud: HUD | null = null;
 
-// Game state
-type GameState = 'playing' | 'gameOver';
-let gameState: GameState = 'playing';
+// Game state — starts in selection screen
+type GameState = 'selection' | 'playing' | 'gameOver';
+let gameState: GameState = 'selection';
 let winnerNum: 1 | 2 = 1;
 let gameOverDelay = 0;
 const GAME_OVER_DELAY_MS = 1500;
+
+// Selection screen state
+let selectionScene: SelectionScene | null = new SelectionScene();
+let selectionUI: SelectionUI | null = new SelectionUI();
+selectionUI.show(2, selectionScene.getCurrentCharacter());
 
 // Collision detection
 const collisionDetector = new CollisionDetector();
@@ -463,6 +454,115 @@ const boundaryMat = new THREE.LineBasicMaterial({ color: 0x333333 });
 const boundary = new THREE.LineSegments(boundaryGeo, boundaryMat);
 scene.add(boundary);
 
+// ----- Transition: selection -> playing -----
+
+function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
+  // Clean up selection
+  if (selectionScene) {
+    selectionScene.dispose();
+    selectionScene = null;
+  }
+  if (selectionUI) {
+    selectionUI.destroy();
+    selectionUI = null;
+  }
+
+  // Create correct player types based on selection
+  if (p1Def.isMichiGichi) {
+    player1 = new MichiGichiPlayer();
+  } else {
+    player1 = new Player(GONDI_STATS);
+  }
+  player1.position = { ...ARENA.PLAYER1_SPAWN };
+  player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
+
+  if (p2Def.isMichiGichi) {
+    player2 = new MichiGichiPlayer();
+  } else {
+    player2 = new Player(GONDI_STATS);
+  }
+  player2.position = { ...ARENA.PLAYER2_SPAWN };
+  player2.previousPosition = { ...ARENA.PLAYER2_SPAWN };
+
+  // Re-setup entity manager with new players
+  entityManager.entities = [];
+  entityManager.add(player1);
+  entityManager.add(player2);
+  entityManager.add(sun);
+
+  // Reset morph animation state
+  p1Mixer = null;
+  p1AnimAction = null;
+  p2Mixer = null;
+  p2AnimAction = null;
+
+  // Load models for selected characters
+  loadPlayerModel(
+    p1Def,
+    (mesh) => { p1Mesh = mesh; },
+    (mixer, action) => { p1Mixer = mixer; p1AnimAction = action; },
+  );
+  loadPlayerModel(
+    p2Def,
+    (mesh) => { p2Mesh = mesh; },
+    (mixer, action) => { p2Mixer = mixer; p2AnimAction = action; },
+  );
+
+  // Reset asteroids for fresh positions each round
+  asteroidPool.releaseAll();
+  for (const [, mesh] of asteroidMeshMap) {
+    mesh.visible = false;
+    scene.remove(mesh);
+  }
+  asteroidMeshMap.clear();
+  if (asteroidModelsLoaded === 3) spawnAsteroids();
+
+  // Show melee HUD
+  hud = new HUD();
+
+  // Reset camera zoom
+  cameraController.reset(camera);
+
+  gameState = 'playing';
+}
+
+// ----- Selection screen keyboard handler -----
+
+window.addEventListener('keydown', (e) => {
+  if (gameState !== 'selection' || !selectionScene || !selectionUI) return;
+  if (selectionScene.state === SelectionState.DONE) return;
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      selectionScene.selectPrev();
+      selectionUI.show(
+        selectionScene.state === SelectionState.SELECTING_P2 ? 2 : 1,
+        selectionScene.getCurrentCharacter(),
+      );
+      break;
+    case 'ArrowRight':
+      selectionScene.selectNext();
+      selectionUI.show(
+        selectionScene.state === SelectionState.SELECTING_P2 ? 2 : 1,
+        selectionScene.getCurrentCharacter(),
+      );
+      break;
+    case 'Enter': {
+      selectionScene.confirmSelection();
+      // Read state after mutation; cast needed because TS narrows from the DONE guard above
+      const newState = selectionScene.state as SelectionState;
+      if (newState === SelectionState.SELECTING_P1) {
+        selectionUI.show(1, selectionScene.getCurrentCharacter());
+      } else if (newState === SelectionState.DONE) {
+        selectionUI.hide();
+        const { p1Def, p2Def } = selectionScene.getSelections();
+        startMelee(p1Def, p2Def);
+      }
+      break;
+    }
+  }
+});
+
 // Debug: press 1/2 to instantly kill player 1/2 with explosion
 window.addEventListener('keydown', (e) => {
   if (gameState !== 'playing') return;
@@ -474,32 +574,23 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Restart round on any key during gameOver
-window.addEventListener('keydown', (e) => {
+// Restart round on any key during gameOver — return to selection screen
+window.addEventListener('keydown', () => {
   if (gameState !== 'gameOver') return;
   if (gameOverDelay < GAME_OVER_DELAY_MS) return;
-
-  // Reset players and re-add to EntityManager exactly once
-  // (removeDeadEntities() only removed the dead player; the survivor is still in the list)
-  player1.resetForNewRound({ ...ARENA.PLAYER1_SPAWN });
-  player2.resetForNewRound({ ...ARENA.PLAYER2_SPAWN });
-  entityManager.entities = entityManager.entities.filter(e => e !== player1 && e !== player2);
-  entityManager.add(player1);
-  entityManager.add(player2);
 
   // Clear all pools
   bulletPool.releaseAll();
   snotPool.releaseAll();
   explosionPool.releaseAll();
 
-  // Clear and respawn asteroids
+  // Clear asteroids (will be re-spawned in startMelee)
   asteroidPool.releaseAll();
   for (const [, mesh] of asteroidMeshMap) {
     mesh.visible = false;
     scene.remove(mesh);
   }
   asteroidMeshMap.clear();
-  if (asteroidModelsLoaded === 3) spawnAsteroids();
 
   // Hide bullet/snot/explosion sprites
   for (const [, sprite] of bulletSpriteMap) {
@@ -515,12 +606,25 @@ window.addEventListener('keydown', (e) => {
     scene.remove(sprite);
   }
 
-  // Reset camera zoom
-  cameraController.reset(camera);
+  // Remove player meshes from melee scene
+  if (p1Mesh) { scene.remove(p1Mesh); p1Mesh = null; }
+  if (p2Mesh) { scene.remove(p2Mesh); p2Mesh = null; }
+  p1Mixer = null;
+  p1AnimAction = null;
+  p2Mixer = null;
+  p2AnimAction = null;
 
-  // Reset game state
-  hud.hide();
-  gameState = 'playing';
+  // Destroy HUD
+  if (hud) {
+    hud.destroy();
+    hud = null;
+  }
+
+  // Return to selection screen
+  selectionScene = new SelectionScene();
+  selectionUI = new SelectionUI();
+  selectionUI.show(2, selectionScene.getCurrentCharacter());
+  gameState = 'selection';
 });
 
 // Per-player update helper
@@ -609,6 +713,14 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
+    if (gameState === 'selection') {
+      // Update selection scene animation
+      if (selectionScene) {
+        selectionScene.update(dt);
+      }
+      return;
+    }
+
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
 
     if (gameState === 'playing') {
@@ -628,6 +740,9 @@ const gameLoop = new GameLoop(
 
       if (player1 instanceof MichiGichiPlayer) {
         player1.updateMorph(dt);
+      }
+      if (player2 instanceof MichiGichiPlayer) {
+        player2.updateMorph(dt);
       }
 
       // Update entities
@@ -661,15 +776,15 @@ const gameLoop = new GameLoop(
         winnerNum = player1.alive ? 1 : 2;
         gameOverDelay = 0;
       }
-    } else {
+    } else if (gameState === 'gameOver') {
       // gameOver: accumulate delay, show winner after explosion
       gameOverDelay += dt;
-      if (gameOverDelay >= GAME_OVER_DELAY_MS) {
+      if (gameOverDelay >= GAME_OVER_DELAY_MS && hud) {
         hud.showWinner(winnerNum);
       }
     }
 
-    // --- Always runs regardless of game state ---
+    // --- Always runs during playing/gameOver ---
 
     // Sun animation
     sun.updateAnimation(dt);
@@ -692,11 +807,16 @@ const gameLoop = new GameLoop(
     if (p1Mesh) p1Mesh.visible = player1.alive;
     if (p2Mesh) p2Mesh.visible = player2.alive;
 
-    // Sync MichiGichi morph animation frame
+    // Sync MichiGichi morph animation frames
     if (p1Mixer && p1AnimAction && player1 instanceof MichiGichiPlayer) {
       const clip = p1AnimAction.getClip();
       p1AnimAction.time = (player1.currentAnimFrame / 42) * clip.duration;
       p1Mixer.update(0);
+    }
+    if (p2Mixer && p2AnimAction && player2 instanceof MichiGichiPlayer) {
+      const clip = p2AnimAction.getClip();
+      p2AnimAction.time = (player2.currentAnimFrame / 42) * clip.duration;
+      p2Mixer.update(0);
     }
 
     // Sync bullet sprites and release dead ones
@@ -809,10 +929,17 @@ const gameLoop = new GameLoop(
     stars.position.set(camera.position.x * 0.8, camera.position.y * 0.8, ARENA.STARS_Z);
 
     // HUD update every frame
-    hud.update(player1.health, player1.energy, player2.health, player2.energy);
+    if (hud) {
+      hud.update(player1.health, player1.energy, player2.health, player2.energy);
+    }
   },
   () => {
-    renderer.render(scene, camera);
+    // Render: switch between selection scene and melee scene
+    if (gameState === 'selection' && selectionScene) {
+      renderer.render(selectionScene.scene, selectionScene.camera);
+    } else {
+      renderer.render(scene, camera);
+    }
   }
 );
 
