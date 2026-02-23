@@ -403,9 +403,13 @@ window.addEventListener('keydown', (e) => {
   if (gameState !== 'gameOver') return;
   if (gameOverDelay < GAME_OVER_DELAY_MS) return;
 
-  // Reset players
+  // Reset players and re-add to EntityManager exactly once
+  // (removeDeadEntities() only removed the dead player; the survivor is still in the list)
   player1.resetForNewRound({ ...ARENA.PLAYER1_SPAWN });
   player2.resetForNewRound({ ...ARENA.PLAYER2_SPAWN });
+  entityManager.entities = entityManager.entities.filter(e => e !== player1 && e !== player2);
+  entityManager.add(player1);
+  entityManager.add(player2);
 
   // Clear all pools
   bulletPool.releaseAll();
@@ -434,6 +438,9 @@ window.addEventListener('keydown', (e) => {
     sprite.visible = false;
     scene.remove(sprite);
   }
+
+  // Reset camera zoom
+  cameraController.reset(camera);
 
   // Reset game state
   hud.hide();

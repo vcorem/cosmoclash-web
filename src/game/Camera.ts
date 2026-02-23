@@ -28,6 +28,18 @@ export function createCamera(): THREE.PerspectiveCamera {
 export class CameraController {
   private zoomDist: number = -1;
 
+  reset(camera: THREE.PerspectiveCamera): void {
+    this.zoomDist = -1;
+    const midX = (ARENA.PLAYER1_SPAWN.x + ARENA.PLAYER2_SPAWN.x) / 2;
+    const midY = (ARENA.PLAYER1_SPAWN.y + ARENA.PLAYER2_SPAWN.y) / 2;
+    const spawnDist = Math.sqrt(
+      (ARENA.PLAYER2_SPAWN.x - ARENA.PLAYER1_SPAWN.x) ** 2 +
+      (ARENA.PLAYER2_SPAWN.y - ARENA.PLAYER1_SPAWN.y) ** 2,
+    );
+    camera.position.set(midX, midY, ARENA.CAM_BASE_Z - spawnDist * ARENA.CAM_DISTANCE_SCALE);
+    camera.lookAt(midX, midY, 0);
+  }
+
   update(
     camera: THREE.PerspectiveCamera,
     p1x: number, p1y: number,
