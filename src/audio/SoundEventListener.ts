@@ -13,7 +13,7 @@ export class SoundEventListener implements GameEventListener {
       case GameEventType.BulletHit: {
         const e = event as BulletHitEvent;
         if (e.target.entityType === EntityType.Asteroid) {
-          sm.play(SoundEffect.Explosion);
+          sm.play(SoundEffect.AsteroidHit);
         } else if (e.target instanceof Player) {
           sm.play(SoundEffect.Hit);
         }

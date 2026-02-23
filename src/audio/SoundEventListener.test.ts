@@ -34,12 +34,12 @@ describe('SoundEventListener', () => {
     expect(playSpy).toHaveBeenCalledWith(SoundEffect.Hit);
   });
 
-  it('plays Explosion on BulletHit when target is Asteroid', () => {
+  it('plays AsteroidHit on BulletHit when target is Asteroid', () => {
     const bullet = new Bullet(FLAME_BULLET_CONFIG);
     const target = new Entity();
     target.entityType = EntityType.Asteroid;
     listener.onGameEvent(new BulletHitEvent(bullet, target));
-    expect(playSpy).toHaveBeenCalledWith(SoundEffect.Explosion);
+    expect(playSpy).toHaveBeenCalledWith(SoundEffect.AsteroidHit);
   });
 
   it('plays ExplosionBig on Explosion when entity is Player', () => {
