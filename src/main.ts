@@ -20,6 +20,8 @@ import { Sun } from '@/game/Sun';
 import { applySunGravity } from '@/game/Gravity';
 import { Snot, SNOT_CONFIG } from '@/game/Snot';
 import { Asteroid } from '@/game/Asteroid';
+import { HUD } from '@/ui/HUD';
+import '@/ui/hud.css';
 
 // Setup Three.js
 const scene = createScene();
@@ -349,6 +351,16 @@ entityManager.add(sun);
 const input = new InputManager();
 const cameraController = new CameraController();
 
+// HUD overlay
+const hud = new HUD();
+
+// Game state
+type GameState = 'playing' | 'gameOver';
+let gameState: GameState = 'playing';
+let winnerNum: 1 | 2 = 1;
+let gameOverDelay = 0;
+const GAME_OVER_DELAY_MS = 1500;
+
 // Collision detection
 const collisionDetector = new CollisionDetector();
 const collisionHandler = new CollisionHandler();
@@ -377,12 +389,55 @@ scene.add(boundary);
 
 // Debug: press 1/2 to instantly kill player 1/2 with explosion
 window.addEventListener('keydown', (e) => {
+  if (gameState !== 'playing') return;
   const target = e.key === '1' ? player1 : e.key === '2' ? player2 : null;
   if (target && target.alive) {
     target.health = 0;
     target.destroy();
     GameEventMgr.getInstance().sendEvent(new ExplosionEvent(target));
   }
+});
+
+// Restart round on any key during gameOver
+window.addEventListener('keydown', (e) => {
+  if (gameState !== 'gameOver') return;
+  if (gameOverDelay < GAME_OVER_DELAY_MS) return;
+
+  // Reset players
+  player1.resetForNewRound({ ...ARENA.PLAYER1_SPAWN });
+  player2.resetForNewRound({ ...ARENA.PLAYER2_SPAWN });
+
+  // Clear all pools
+  bulletPool.releaseAll();
+  snotPool.releaseAll();
+  explosionPool.releaseAll();
+
+  // Clear and respawn asteroids
+  asteroidPool.releaseAll();
+  for (const [, mesh] of asteroidMeshMap) {
+    mesh.visible = false;
+    scene.remove(mesh);
+  }
+  asteroidMeshMap.clear();
+  if (asteroidModelsLoaded === 3) spawnAsteroids();
+
+  // Hide bullet/snot/explosion sprites
+  for (const [, sprite] of bulletSpriteMap) {
+    sprite.visible = false;
+    scene.remove(sprite);
+  }
+  for (const [, { sprite }] of snotSpriteMap) {
+    sprite.visible = false;
+    scene.remove(sprite);
+  }
+  for (const [, sprite] of explosionSpriteMap) {
+    sprite.visible = false;
+    scene.remove(sprite);
+  }
+
+  // Reset game state
+  hud.hide();
+  gameState = 'playing';
 });
 
 // Per-player update helper
@@ -467,49 +522,63 @@ function syncMesh(mesh: THREE.Object3D | null, player: Player): void {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
-    // Collision detection FIRST (matches original C++ loop order).
-    // Running before input/movement means deflected velocities are already
-    // set when thrust is applied, preventing ships from re-entering overlap.
-    const allEntities = [
-      ...entityManager.entities,
-      ...bulletPool.activeEntities,
-      ...snotPool.activeEntities,
-      ...asteroidPool.activeEntities,
-    ];
-    collisionDetector.checkCollisions(allEntities);
-    enforceMinimumDistance(player1, player2);
-
-    // Process input for both players
-    updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
-    updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
-
-    // Update entities
     const camCenter = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
-    entityManager.update(dt, camCenter);
 
-    // Update pooled bullets
-    bulletPool.forEachActive((bullet) => {
-      bullet.update(dt);
-      bullet.handleWrapAround(camCenter);
-    });
+    if (gameState === 'playing') {
+      // Collision detection FIRST (matches original C++ loop order)
+      const allEntities = [
+        ...entityManager.entities,
+        ...bulletPool.activeEntities,
+        ...snotPool.activeEntities,
+        ...asteroidPool.activeEntities,
+      ];
+      collisionDetector.checkCollisions(allEntities);
+      enforceMinimumDistance(player1, player2);
 
-    // Update pooled snots
-    snotPool.forEachActive((snot) => {
-      snot.update(dt);
-      snot.handleWrapAround(camCenter);
-    });
+      // Process input for both players
+      updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
+      updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
 
-    // Update pooled asteroids
-    asteroidPool.forEachActive((asteroid) => {
-      asteroid.update(dt);
-      asteroid.handleWrapAround(camCenter);
-    });
+      // Update entities
+      entityManager.update(dt, camCenter);
 
-    // Sun gravity — applied to players only (matches original C++)
-    applySunGravity(player1, ARENA.SUN_POSITION, dt);
-    applySunGravity(player2, ARENA.SUN_POSITION, dt);
+      // Update pooled bullets
+      bulletPool.forEachActive((bullet) => {
+        bullet.update(dt);
+        bullet.handleWrapAround(camCenter);
+      });
 
-    // No sun gravity on snots or asteroids (matches original C++ — gravity is players only)
+      // Update pooled snots
+      snotPool.forEachActive((snot) => {
+        snot.update(dt);
+        snot.handleWrapAround(camCenter);
+      });
+
+      // Update pooled asteroids
+      asteroidPool.forEachActive((asteroid) => {
+        asteroid.update(dt);
+        asteroid.handleWrapAround(camCenter);
+      });
+
+      // Sun gravity — applied to players only (matches original C++)
+      applySunGravity(player1, ARENA.SUN_POSITION, dt);
+      applySunGravity(player2, ARENA.SUN_POSITION, dt);
+
+      // Winner detection
+      if (!player1.alive || !player2.alive) {
+        gameState = 'gameOver';
+        winnerNum = player1.alive ? 1 : 2;
+        gameOverDelay = 0;
+      }
+    } else {
+      // gameOver: accumulate delay, show winner after explosion
+      gameOverDelay += dt;
+      if (gameOverDelay >= GAME_OVER_DELAY_MS) {
+        hud.showWinner(winnerNum);
+      }
+    }
+
+    // --- Always runs regardless of game state ---
 
     // Sun animation
     sun.updateAnimation(dt);
@@ -565,7 +634,7 @@ const gameLoop = new GameLoop(
       }
     }
 
-    // Update explosions
+    // Update explosions (always — so death animation plays during gameOver)
     explosionPool.forEachActive((expl) => {
       expl.update(dt);
       expl.handleWrapAround(camCenter);
@@ -615,6 +684,9 @@ const gameLoop = new GameLoop(
 
     // Parallax: stars scroll at 80% of camera speed for depth effect
     stars.position.set(camera.position.x * 0.8, camera.position.y * 0.8, ARENA.STARS_Z);
+
+    // HUD update every frame
+    hud.update(player1.health, player1.energy, player2.health, player2.energy);
   },
   () => {
     renderer.render(scene, camera);
