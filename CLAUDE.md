@@ -50,7 +50,7 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 
 ## Current Implementation State
 
-**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI), M10 (MichiGichi ship & weapons)
+**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI), M10 (MichiGichi ship & weapons), Selection Screen
 
 **Tech stack:** Three.js, TypeScript, Vite, Vitest
 
@@ -61,13 +61,14 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - Pooled entities (bullets, snots, explosions, asteroids) live OUTSIDE `EntityManager` — they have their own update/sync loops in `main.ts`. `EntityManager` only holds players + sun
 - Asteroids: 3 types with different collision radii (8, 18, 15), 3D glTF meshes with rotation, wrap-around, no gravity (matches C++). Asteroid-player = bounce only (no damage, simple velocity redirect). Asteroid-bullet = instant destroy + smaller explosion (150 vs 300 billboard)
 - HUD: HTML/CSS overlay (`src/ui/HUD.ts` + `src/ui/hud.css`) with 40-segment health/energy bars per player, gradient colors matching original C++ PlayerPanel. Energy bars have CSS decay animation on empty segments
-- Game state: `'playing' | 'gameOver'` in main.ts. Winner detection after collision, 1500ms delay for explosion, "Player X Wins!" overlay with press-any-key restart
+- Game state: `'selection' | 'playing' | 'gameOver'` in main.ts. Selection → melee → gameOver → back to selection
+- Selection screen: `SelectionScene` (`src/game/SelectionScene.ts`) — separate Three.js scene with 3D ship models, starfield, fly animations. `SelectionUI` (`src/ui/SelectionUI.ts`) — HTML/CSS overlay showing ship name/weapon/special. `CharacterRegistry` (`src/game/CharacterRegistry.ts`) — data-driven CharacterDef array. Sequential selection: P2 first, then P1. Arrow keys browse, Enter confirms. Renderer switches between selection and melee scenes
 - `EntityPool.releaseAll()` clears all active entities to free list (used during restart)
 - `Player.resetForNewRound(spawnPos)` resets all player state for round restart
 - Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion (gated on playing state)
 - MichiGichiPlayer (`src/game/MichiGichiPlayer.ts`): extends Player with 4-state morph machine (MICHI ↔ GICHI). MICHI form = slow (0.2 speed), plasma weapon. GICHI form = fast (1.0 speed), sun weapon. Secondary weapon triggers morph (no projectile). 20ms frame delay × 42 frames ≈ 840ms transition. Two collision spheres: (0,-10,0) r14 and (0,10,0) r14
 - BulletConfig optional fields: `tracking?`, `expandingRadius?`, `decayingDamage?` — Bullet.update() applies dynamic behaviors when present. `getCurrentDamage()` returns decaying or flat damage. Bullet-bullet collisions are skipped entirely (matches C++ CBullet::VerifyCollision)
-- Player 1 = MichiGichiPlayer (michiGichi.glb with AnimationMixer for morph), Player 2 = Gondi (gondi.glb)
+- Player types driven by CharacterDef selection: `loadPlayerModel(charDef)` creates correct player type (MichiGichiPlayer or Player) and loads model. Both P1 and P2 support morph (symmetric p1Mixer/p2Mixer). Players are `let` (reassigned each round based on selection)
 
 **Input bindings:**
 - Player 1: ArrowUp/Left/Right (thrust/rotate), `/` (fire), `.` (morph/secondary)
@@ -108,6 +109,6 @@ texture.offset.set(col / cols, 1 - (row + 1) / rows);
 
 ```bash
 npm run dev          # Start dev server
-npx vitest run       # Run all tests (295 tests)
+npx vitest run       # Run all tests (924 tests)
 npx tsc --noEmit     # Type check
 ```
