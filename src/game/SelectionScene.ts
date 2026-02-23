@@ -10,7 +10,7 @@ export enum SelectionState {
 }
 
 const SHIP_SPACING = 300;
-const SHIP_FRONT_Z = -400;
+const SHIP_FRONT_Z = -200;
 const SHIP_BACK_Z = 400;
 const FLY_DURATION = 400;
 const CAM_Z = -700;
@@ -45,8 +45,9 @@ export class SelectionScene {
     this.camera = new THREE.PerspectiveCamera(
       CAM_FOV, window.innerWidth / window.innerHeight, 0.1, 100000,
     );
-    this.camera.position.set(0, 0, CAM_Z);
-    this.camera.lookAt(0, 0, 0);
+    const initialX = this.getShipX(0);
+    this.camera.position.set(initialX, 0, CAM_Z);
+    this.camera.lookAt(initialX, 0, 0);
 
     this.stars = this.createStarField();
     this.scene.add(this.stars);
