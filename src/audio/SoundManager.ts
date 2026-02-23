@@ -11,6 +11,8 @@ export class SoundManager {
   private musicBuffers = new Map<string, AudioBuffer>();
   private musicSource: AudioBufferSourceNode | null = null;
   private currentMusicKey: string | null = null;
+  private preloadPromise: Promise<void> | null = null;
+  private pendingMusicKey: string | null = null;
 
   private masterVolume: number;
   private muted: boolean;
@@ -50,7 +52,13 @@ export class SoundManager {
     return this.ctx;
   }
 
-  async preload(): Promise<void> {
+  preload(): Promise<void> {
+    if (this.preloadPromise) return this.preloadPromise;
+    this.preloadPromise = this.doPreload();
+    return this.preloadPromise;
+  }
+
+  private async doPreload(): Promise<void> {
     const ctx = this.ensureContext();
 
     // Preload SFX
@@ -84,6 +92,13 @@ export class SoundManager {
     });
 
     await Promise.all([...sfxPromises, ...musicPromises]);
+
+    // Play any music that was requested before preload finished
+    if (this.pendingMusicKey) {
+      const key = this.pendingMusicKey;
+      this.pendingMusicKey = null;
+      this.playMusic(key);
+    }
   }
 
   play(effect: SoundEffect): void {
@@ -104,7 +119,11 @@ export class SoundManager {
     if (this.currentMusicKey === key) return;
     this.stopMusic();
     const buf = this.musicBuffers.get(key);
-    if (!buf) return;
+    if (!buf) {
+      // Buffers not loaded yet — queue for after preload completes
+      this.pendingMusicKey = key;
+      return;
+    }
     const ctx = this.ensureContext();
     this.musicSource = ctx.createBufferSource();
     this.musicSource.buffer = buf;
