@@ -10,6 +10,7 @@ import { EntityPool } from '@/engine/EntityPool';
 import { CharacterDef } from '@/game/CharacterRegistry';
 import { ARENA } from '@/game/Arena';
 import { AI_ENTITY_TYPES } from './AIConstants';
+import { getVVAngle } from './AICalc';
 
 // ---------- Entity type detection ----------
 
@@ -118,6 +119,8 @@ export interface PlayerTable {
   snots: Snot[];
   /** Number of snots attached to this player */
   snotCount: number;
+  /** Velocity vector angle (0-360, relative to Y-axis) */
+  VVAngle: number;
   /** MorphState if MichiGichi, undefined otherwise */
   morphState?: MorphState;
 }
@@ -238,6 +241,7 @@ export function buildPlayerTable(
     shots,
     snots,
     snotCount: player.snotCount,
+    VVAngle: getVVAngle(dxVector, dyVector),
     morphState,
   };
 }
