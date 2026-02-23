@@ -156,8 +156,9 @@ export class HUD {
     }
   }
 
-  showWinner(playerNum: 1 | 2): void {
+  showWinner(playerNum: 1 | 2, showRestartHint = true): void {
     this.winText.textContent = `Player ${playerNum} Wins!`;
+    this.restartText.style.display = showRestartHint ? '' : 'none';
     this.overlay.style.display = 'flex';
   }
 

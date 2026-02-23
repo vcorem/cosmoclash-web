@@ -432,12 +432,17 @@ let hud: HUD | null = null;
 let aiController: AIController | null = null;
 let aiDifficulty: DifficultyLevel = 3;
 
+// Gauntlet state — tracks remaining AI ships for consecutive rounds
+let currentP1Def: CharacterDef | null = null;
+let remainingAIShips: CharacterDef[] = [];
+
 // Game state — starts with logo splash
 type GameState = 'logo' | 'menu' | 'difficulty' | 'selection' | 'playing' | 'gameOver';
 let gameState: GameState = 'logo';
 let winnerNum: 1 | 2 = 1;
 let gameOverDelay = 0;
 const GAME_OVER_DELAY_MS = 1500;
+const GAUNTLET_ADVANCE_MS = 5000;
 
 // Menu state
 let mainMenu: MainMenu | null = null;
@@ -600,10 +605,15 @@ window.addEventListener('keydown', (e) => {
       selectionUI.show(1, selectionScene.getCurrentCharacter());
       break;
     case 'Enter': {
-      // P1 confirms — assign random P2 and start
+      // P1 confirms — assign random P2 and start gauntlet
       const p1Def = selectionScene.getCurrentCharacter();
+      currentP1Def = p1Def;
+
+      // Build gauntlet roster: all ships except the one picked for first round
       const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
       const p2Def = CHARACTER_REGISTRY[p2Index];
+      remainingAIShips = CHARACTER_REGISTRY.filter((_, i) => i !== p2Index);
+
       selectionUI.hide();
       startMelee(p1Def, p2Def);
       break;
@@ -622,11 +632,8 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Restart round on any key during gameOver — return to selection screen
-window.addEventListener('keydown', () => {
-  if (gameState !== 'gameOver') return;
-  if (gameOverDelay < GAME_OVER_DELAY_MS) return;
-
+// Cleanup pools, sprites, and meshes between rounds
+function cleanupRound(): void {
   // Clear all pools
   bulletPool.releaseAll();
   snotPool.releaseAll();
@@ -661,14 +668,22 @@ window.addEventListener('keydown', () => {
   p1AnimAction = null;
   p2Mixer = null;
   p2AnimAction = null;
+}
 
-  // Destroy HUD
+// Game over: press any key to return to menu (only when gauntlet isn't auto-advancing)
+window.addEventListener('keydown', () => {
+  if (gameState !== 'gameOver') return;
+  if (gameOverDelay < GAME_OVER_DELAY_MS) return;
+
+  // Gauntlet auto-advances — ignore keypresses while waiting
+  const gauntletContinues = winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
+  if (gauntletContinues) return;
+
+  cleanupRound();
   if (hud) {
     hud.destroy();
     hud = null;
   }
-
-  // Return to main menu
   showMainMenu();
 });
 
@@ -833,8 +848,19 @@ const gameLoop = new GameLoop(
     } else if (gameState === 'gameOver') {
       // gameOver: accumulate delay, show winner after explosion
       gameOverDelay += dt;
+      const gauntletContinues = winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
       if (gameOverDelay >= GAME_OVER_DELAY_MS && hud) {
-        hud.showWinner(winnerNum);
+        hud.showWinner(winnerNum, !gauntletContinues);
+      }
+      // Gauntlet: auto-advance to next round after showing winner for 5 seconds
+      if (gauntletContinues && gameOverDelay >= GAME_OVER_DELAY_MS + GAUNTLET_ADVANCE_MS) {
+        cleanupRound();
+        if (hud) { hud.destroy(); hud = null; }
+        const nextIndex = Math.floor(Math.random() * remainingAIShips.length);
+        const nextP2Def = remainingAIShips[nextIndex];
+        remainingAIShips.splice(nextIndex, 1);
+        startMelee(currentP1Def!, nextP2Def);
+        return;
       }
     }
 
