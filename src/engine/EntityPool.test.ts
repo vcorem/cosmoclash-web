@@ -117,4 +117,26 @@ describe('EntityPool', () => {
       expect(entities).toHaveLength(2);
     });
   });
+
+  describe('releaseAll', () => {
+    it('moves all active entities to free list', () => {
+      const pool = new EntityPool<Entity>(() => new Entity(), () => {}, 5);
+      pool.acquire();
+      pool.acquire();
+      pool.acquire();
+      expect(pool.activeCount).toBe(3);
+      pool.releaseAll();
+      expect(pool.activeCount).toBe(0);
+      expect(pool.freeCount).toBe(5); // original 2 free + 3 released
+    });
+
+    it('sets alive=false on all released entities', () => {
+      const pool = new EntityPool<Entity>(() => new Entity(), () => {}, 3);
+      const a = pool.acquire();
+      const b = pool.acquire();
+      pool.releaseAll();
+      expect(a.alive).toBe(false);
+      expect(b.alive).toBe(false);
+    });
+  });
 });

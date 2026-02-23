@@ -42,6 +42,14 @@ export class EntityPool<T extends Entity> {
     }
   }
 
+  releaseAll(): void {
+    for (const e of this.active) {
+      e.alive = false;
+      this.free.push(e);
+    }
+    this.active.clear();
+  }
+
   forEachActive(fn: (e: T) => void): void {
     for (const e of this.active) {
       fn(e);
