@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GameLoop } from '@/engine/GameLoop';
 import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
-import { MichiGichiPlayer } from '@/game/MichiGichiPlayer';
+import { MichiGichiPlayer, MorphState } from '@/game/MichiGichiPlayer';
 import { ARENA } from '@/game/Arena';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG } from '@/game/Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
@@ -31,6 +31,9 @@ import { DifficultyUI } from '@/ui/DifficultyUI';
 import { Viewport } from '@/ui/Viewport';
 import { AIController } from '@/ai/AIController';
 import { DifficultyLevel } from '@/ai/AIConstants';
+import { SoundManager } from '@/audio/SoundManager';
+import { SoundEventListener } from '@/audio/SoundEventListener';
+import { SoundEffect } from '@/audio/SoundEffect';
 import '@/ui/hud.css';
 
 // Viewport container — maintains 4:3 aspect ratio with letterboxing
@@ -455,6 +458,7 @@ function showMainMenu(): void {
     showDifficultyScreen();
   });
   gameState = 'menu';
+  SoundManager.getInstance().playMusic('intro');
 }
 
 function showDifficultyScreen(): void {
@@ -490,6 +494,14 @@ GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.BulletHit
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.Collision);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SunCollision);
 GameEventMgr.getInstance().addListener(collisionHandler, GameEventType.SnotHit);
+
+// Sound system
+const soundEventListener = new SoundEventListener();
+GameEventMgr.getInstance().addListener(soundEventListener, GameEventType.BulletHit);
+GameEventMgr.getInstance().addListener(soundEventListener, GameEventType.Explosion);
+GameEventMgr.getInstance().addListener(soundEventListener, GameEventType.SunCollision);
+GameEventMgr.getInstance().addListener(soundEventListener, GameEventType.SnotHit);
+SoundManager.getInstance().preload();
 
 const explosionListener: GameEventListener = {
   onGameEvent(event: GameEvent) {
@@ -582,6 +594,7 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   cameraController.reset(camera);
 
   gameState = 'playing';
+  SoundManager.getInstance().playMusic('battle');
 }
 
 // ----- Selection screen keyboard handler -----
@@ -618,6 +631,13 @@ window.addEventListener('keydown', (e) => {
       startMelee(p1Def, p2Def);
       break;
     }
+  }
+});
+
+// Mute toggle: press M to mute/unmute all audio
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'm' || e.key === 'M') {
+    SoundManager.getInstance().toggleMute();
   }
 });
 
@@ -721,6 +741,9 @@ function updatePlayerInput(
       player.primaryCooldown = player.stats.primaryWeaponDelay;
 
       const bullet = acquireBullet(player.stats.primaryBulletConfig, player, enemy);
+      if (player.stats.primaryBulletConfig.sound) {
+        SoundManager.getInstance().play(player.stats.primaryBulletConfig.sound);
+      }
       bullet.angle = player.angle;
 
       const spawnVec = player.getFullSpeedVec(25);
@@ -737,6 +760,9 @@ function updatePlayerInput(
 
   if (pi.fireSecondary) {
     if (player instanceof MichiGichiPlayer) {
+      const morphSound = player.morphState === MorphState.MICHI
+        ? SoundEffect.MorphOpen : SoundEffect.MorphClose;
+      SoundManager.getInstance().play(morphSound);
       player.triggerMorph();
     } else {
       if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
@@ -744,6 +770,7 @@ function updatePlayerInput(
         player.secondaryCooldown = ARENA.SECONDARY_WEAPON_DELAY;
 
         const snot = acquireSnot(player, enemy);
+        SoundManager.getInstance().play(SoundEffect.SnotShot);
         snot.angle = player.angle;
 
         const spawnVec = player.getFullSpeedVec(25);
