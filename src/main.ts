@@ -760,9 +760,11 @@ function updatePlayerInput(
 
   if (pi.fireSecondary) {
     if (player instanceof MichiGichiPlayer) {
-      const morphSound = player.morphState === MorphState.MICHI
-        ? SoundEffect.MorphOpen : SoundEffect.MorphClose;
-      SoundManager.getInstance().play(morphSound);
+      if (player.morphState === MorphState.MICHI || player.morphState === MorphState.GICHI) {
+        const morphSound = player.morphState === MorphState.MICHI
+          ? SoundEffect.MorphOpen : SoundEffect.MorphClose;
+        SoundManager.getInstance().play(morphSound);
+      }
       player.triggerMorph();
     } else {
       if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
