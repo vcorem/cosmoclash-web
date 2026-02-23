@@ -50,7 +50,7 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 
 ## Current Implementation State
 
-**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI), M10 (MichiGichi ship & weapons), Selection Screen
+**Completed milestones:** M1 (rendering), M2 (movement), M3 (collision), M4 (weapons), M5 (energy/HUD), M6 (snot mechanic), M7 (entity pooling & explosions), M8 (asteroids), M9 (HUD/UI), M10 (MichiGichi ship & weapons), Selection Screen, M12 (sound)
 
 **Tech stack:** Three.js, TypeScript, Vite, Vitest
 
@@ -70,9 +70,12 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - BulletConfig optional fields: `tracking?`, `expandingRadius?`, `decayingDamage?` — Bullet.update() applies dynamic behaviors when present. `getCurrentDamage()` returns decaying or flat damage. Bullet-bullet collisions are skipped entirely (matches C++ CBullet::VerifyCollision)
 - Player types driven by CharacterDef selection: `loadPlayerModel(charDef)` creates correct player type (MichiGichiPlayer or Player) and loads model. Both P1 and P2 support morph (symmetric p1Mixer/p2Mixer). Players are `let` (reassigned each round based on selection)
 
+**Sound system:** `SoundManager` singleton (Web Audio API) in `src/audio/`. 14 SFX + 2 music tracks preloaded as AudioBuffers. `SoundEventListener` implements `GameEventListener` for collision sounds (BulletHit→Hit/AsteroidHit, Explosion→ExplosionBig/Explosion, SunCollision→SunBoom, SnotHit→SnotHit). Direct calls in main.ts for weapon fire (from `BulletConfig.sound`), morph, snot, and music transitions. M key toggles mute. Volume/mute persisted in localStorage.
+
 **Input bindings:**
 - Player 1: ArrowUp/Left/Right (thrust/rotate), `/` (fire), `.` (morph/secondary)
 - Player 2: WASD (thrust/rotate), Space (fire), Shift (secondary/snot)
+- M: toggle mute
 
 ## Sprite Atlas Best Practices
 
