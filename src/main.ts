@@ -4,8 +4,9 @@ import { GameLoop } from '@/engine/GameLoop';
 import { EntityManager } from '@/engine/EntityManager';
 import { Player, GONDI_STATS } from '@/game/Player';
 import { MichiGichiPlayer, MorphState } from '@/game/MichiGichiPlayer';
+import { SholevPlayer } from '@/game/SholevPlayer';
 import { ARENA } from '@/game/Arena';
-import { Bullet, BulletConfig, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG } from '@/game/Bullet';
+import { Bullet, BulletConfig, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG, ICE_BULLET_CONFIG, FROST_SHIELD_CONFIG } from '@/game/Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
 import { EntityPool } from '@/engine/EntityPool';
 import { InputManager, PlayerInput } from '@/input/InputManager';
@@ -171,6 +172,14 @@ new THREE.TextureLoader().load('/textures/plasma_atlas.png', (tex) => {
 });
 const sunShotTexture = new THREE.TextureLoader().load('/textures/sun_shot.png');
 
+const ICE_ATLAS_COLS = 9;
+const ICE_ATLAS_ROWS = 8;
+const ICE_TOTAL_FRAMES = 65;
+const iceAtlasTexture = new THREE.TextureLoader().load('/textures/ice_shot_atlas.png');
+iceAtlasTexture.colorSpace = THREE.SRGBColorSpace;
+
+const frostShieldTexture = new THREE.TextureLoader().load('/textures/frost_shield.png');
+
 // Bullet pool with sprite management
 const BULLET_POOL_SIZE = 50;
 const bulletPool = new EntityPool<Bullet>(
@@ -216,6 +225,19 @@ function acquireBullet(config: BulletConfig, origin: Entity, target?: Entity): B
   } else if (config === SUN_BULLET_CONFIG) {
     mat.map = sunShotTexture;
     sprite.scale.set(10, 10, 1);
+  } else if (config === ICE_BULLET_CONFIG) {
+    const tex = iceAtlasTexture.clone();
+    tex.repeat.set(1 / ICE_ATLAS_COLS, 1 / ICE_ATLAS_ROWS);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.needsUpdate = true;
+    mat.map = tex;
+    sprite.scale.set(15, 15, 1);
+    bullet.animFrame = 0;
+    bullet.animSpeed = 0.2;
+  } else if (config === FROST_SHIELD_CONFIG) {
+    mat.map = frostShieldTexture;
+    sprite.scale.set(50, 50, 1);
   } else {
     mat.map = flameTexture;
     sprite.scale.set(35, 35, 1);
@@ -573,6 +595,12 @@ scene.add(boundary);
 
 // ----- Transition: selection -> playing -----
 
+function createPlayerForDef(charDef: CharacterDef): Player {
+  if (charDef.isMichiGichi) return new MichiGichiPlayer();
+  if (charDef.id === 'sholev') return new SholevPlayer();
+  return new Player(GONDI_STATS);
+}
+
 function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   // Clean up selection
   if (selectionScene) {
@@ -585,19 +613,11 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   }
 
   // Create correct player types based on selection
-  if (p1Def.isMichiGichi) {
-    player1 = new MichiGichiPlayer();
-  } else {
-    player1 = new Player(GONDI_STATS);
-  }
+  player1 = createPlayerForDef(p1Def);
   player1.position = { ...ARENA.PLAYER1_SPAWN };
   player1.previousPosition = { ...ARENA.PLAYER1_SPAWN };
 
-  if (p2Def.isMichiGichi) {
-    player2 = new MichiGichiPlayer();
-  } else {
-    player2 = new Player(GONDI_STATS);
-  }
+  player2 = createPlayerForDef(p2Def);
   player2.position = { ...ARENA.PLAYER2_SPAWN };
   player2.previousPosition = { ...ARENA.PLAYER2_SPAWN };
 
@@ -793,7 +813,8 @@ function updatePlayerInput(
   }
 
   // Thrust particles
-  thrustEffect.update(dt, pi.thrust, player.position.x, player.position.y, player.angle);
+  const showThrust = pi.thrust && !(player instanceof SholevPlayer && player.frostShieldActive);
+  thrustEffect.update(dt, showThrust, player.position.x, player.position.y, player.angle);
 
   // Energy & weapons
   player.updateEnergy(dt);
@@ -834,6 +855,16 @@ function updatePlayerInput(
         SoundManager.getInstance().play(morphSound);
       }
       player.triggerMorph();
+    } else if (player instanceof SholevPlayer) {
+      if (!player.frostShieldActive && player.activateFrostShield()) {
+        const bullet = acquireBullet(FROST_SHIELD_CONFIG, player);
+        bullet.position = { ...player.position };
+        bullet.previousPosition = { ...player.position };
+        bullet.localOffsetDistance = 0;
+        bullet.attachedSpeed = 0;
+        player.setFrostBullet(bullet);
+        SoundManager.getInstance().play(SoundEffect.FrostShot);
+      }
     } else {
       if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
         player.energy -= player.stats.primaryEnergyCost;
@@ -977,6 +1008,13 @@ const gameLoop = new GameLoop(
       }
       if (player2 instanceof MichiGichiPlayer) {
         player2.updateMorph(dt);
+      }
+
+      if (player1 instanceof SholevPlayer) {
+        player1.updateFrostShield(dt);
+      }
+      if (player2 instanceof SholevPlayer) {
+        player2.updateFrostShield(dt);
       }
 
       // Update entities
@@ -1125,6 +1163,27 @@ const gameLoop = new GameLoop(
         const elapsed = bullet.config.maxTtl - bullet.ttl;
         const size = Math.max(20, elapsed / 60.0);
         sprite.scale.set(size, size, 1);
+      } else if (bullet.config === ICE_BULLET_CONFIG) {
+        // Frame animation (matching C++ m_curTex += m_AnimSpeed * dt)
+        bullet.animFrame += bullet.animSpeed * dt;
+        if (bullet.animFrame > ICE_TOTAL_FRAMES - 1) {
+          bullet.animFrame = 0;
+        }
+        // UV offset into 9x8 atlas
+        const mat = sprite.material as THREE.SpriteMaterial;
+        if (mat.map) {
+          const fi = Math.floor(bullet.animFrame) % ICE_TOTAL_FRAMES;
+          const col = fi % ICE_ATLAS_COLS;
+          const row = Math.floor(fi / ICE_ATLAS_COLS);
+          mat.map.offset.set(col / ICE_ATLAS_COLS, 1 - (row + 1) / ICE_ATLAS_ROWS);
+        }
+        // Rotate to match heading
+        (sprite.material as THREE.SpriteMaterial).rotation = bullet.angle * (Math.PI / 180);
+      } else if (bullet.config === FROST_SHIELD_CONFIG) {
+        // Slowly rotate frost shield sprite
+        const mat = sprite.material as THREE.SpriteMaterial;
+        const elapsed = bullet.config.maxTtl - bullet.ttl;
+        mat.rotation = elapsed * 0.003;
       }
     });
     bulletPool.releaseInactive();
