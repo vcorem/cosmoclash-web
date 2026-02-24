@@ -592,14 +592,6 @@ const explosionListener: GameEventListener = {
 };
 GameEventMgr.getInstance().addListener(explosionListener, GameEventType.Explosion);
 
-// Dev helper: faint arena boundary
-const boundaryGeo = new THREE.EdgesGeometry(
-  new THREE.PlaneGeometry(ARENA.WRAP_X * 2, ARENA.WRAP_Y * 2)
-);
-const boundaryMat = new THREE.LineBasicMaterial({ color: 0x333333 });
-const boundary = new THREE.LineSegments(boundaryGeo, boundaryMat);
-scene.add(boundary);
-
 // ----- Transition: selection -> playing -----
 
 function createPlayerForDef(charDef: CharacterDef): Player {

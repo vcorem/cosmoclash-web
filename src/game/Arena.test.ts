@@ -25,6 +25,6 @@ describe('Arena constants', () => {
   });
 
   it('has correct player 1 spawn position', () => {
-    expect(ARENA.PLAYER1_SPAWN).toEqual({ x: -500, y: -70, z: 0 });
+    expect(ARENA.PLAYER1_SPAWN).toEqual({ x: 500, y: -70, z: 0 });
   });
 });

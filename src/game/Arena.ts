@@ -18,8 +18,8 @@ export const ARENA = {
   TIME_SCALER: 0.35,
 
   // Spawn positions
-  PLAYER1_SPAWN: { x: -500, y: -70, z: 0 },
-  PLAYER2_SPAWN: { x: 500, y: -70, z: 0 },
+  PLAYER1_SPAWN: { x: 500, y: -70, z: 0 },
+  PLAYER2_SPAWN: { x: -500, y: -70, z: 0 },
 
   // Sun
   SUN_POSITION: { x: 0, y: 0, z: 0 },
