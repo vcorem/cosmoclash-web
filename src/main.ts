@@ -809,6 +809,9 @@ window.addEventListener('keydown', () => {
   showMainMenu();
 });
 
+let p1PrevSecondary = false;
+let p2PrevSecondary = false;
+
 // Per-player update helper
 function updatePlayerInput(
   player: Player,
@@ -816,6 +819,7 @@ function updatePlayerInput(
   pi: PlayerInput,
   thrustEffect: ThrustEffect,
   dt: number,
+  isP1: boolean,
 ): void {
   // Rotation
   if (pi.rotateLeft) {
@@ -843,25 +847,41 @@ function updatePlayerInput(
       player.energy -= player.stats.primaryEnergyCost;
       player.primaryCooldown = player.stats.primaryWeaponDelay;
 
-      const bullet = acquireBullet(player.stats.primaryBulletConfig, player, enemy);
-      if (player.stats.primaryBulletConfig.sound) {
-        SoundManager.getInstance().play(player.stats.primaryBulletConfig.sound);
+      const config = player.stats.primaryBulletConfig;
+      if (config.sound) {
+        SoundManager.getInstance().play(config.sound);
       }
-      bullet.angle = player.angle;
 
-      const spawnVec = player.getFullSpeedVec(25);
-      bullet.position = {
-        x: player.position.x + spawnVec.x,
-        y: player.position.y + spawnVec.y,
-        z: player.position.z,
-      };
-      bullet.previousPosition = { ...bullet.position };
-      const speedVec = player.getFullSpeedVec(player.stats.primaryBulletConfig.speedMaxScaler);
-      bullet.accelVec = { ...speedVec };
+      // Sholev fires 8 ice shards in a radial burst; others fire 1 forward
+      const SHARD_COUNT = player instanceof SholevPlayer ? 8 : 1;
+      for (let i = 0; i < SHARD_COUNT; i++) {
+        const bulletAngle = SHARD_COUNT === 1
+          ? player.angle
+          : (360 / SHARD_COUNT) * i;
 
-      if (bullet.config.attached) {
-        bullet.attachedSpeed = player.stats.primaryBulletConfig.speedMaxScaler;
-        bullet.localOffsetDistance = 25;
+        const bullet = acquireBullet(config, player, enemy);
+        bullet.angle = bulletAngle;
+
+        const rad = bulletAngle * (Math.PI / 180);
+        const spawnX = -Math.sin(rad) * 25;
+        const spawnY = Math.cos(rad) * 25;
+        bullet.position = {
+          x: player.position.x + spawnX,
+          y: player.position.y + spawnY,
+          z: player.position.z,
+        };
+        bullet.previousPosition = { ...bullet.position };
+        const speed = config.speedMaxScaler;
+        bullet.accelVec = {
+          x: -Math.sin(rad) * speed,
+          y: Math.cos(rad) * speed,
+          z: 0,
+        };
+
+        if (bullet.config.attached) {
+          bullet.attachedSpeed = config.speedMaxScaler;
+          bullet.localOffsetDistance = 25;
+        }
       }
     }
   }
@@ -875,14 +895,20 @@ function updatePlayerInput(
       }
       player.triggerMorph();
     } else if (player instanceof SholevPlayer) {
-      if (!player.frostShieldActive && player.activateFrostShield()) {
-        const bullet = acquireBullet(FROST_SHIELD_CONFIG, player);
-        bullet.position = { ...player.position };
-        bullet.previousPosition = { ...player.position };
-        bullet.localOffsetDistance = 0;
-        bullet.attachedSpeed = 0;
-        player.setFrostBullet(bullet);
-        SoundManager.getInstance().play(SoundEffect.FrostShot);
+      // Edge-detect: only toggle on key-down, not while held
+      const prevSec = isP1 ? p1PrevSecondary : p2PrevSecondary;
+      if (!prevSec) {
+        if (player.frostShieldActive) {
+          player.deactivateFrostShieldManual();
+        } else if (player.activateFrostShield()) {
+          const bullet = acquireBullet(FROST_SHIELD_CONFIG, player);
+          bullet.position = { ...player.position };
+          bullet.previousPosition = { ...player.position };
+          bullet.localOffsetDistance = 0;
+          bullet.attachedSpeed = 0;
+          player.setFrostBullet(bullet);
+          SoundManager.getInstance().play(SoundEffect.FrostShot);
+        }
       }
     } else {
       if (player.secondaryCooldown <= 0 && player.energy > player.stats.primaryEnergyCost) {
@@ -905,6 +931,10 @@ function updatePlayerInput(
       }
     }
   }
+
+  // Track secondary key state for edge detection
+  if (isP1) p1PrevSecondary = pi.fireSecondary;
+  else p2PrevSecondary = pi.fireSecondary;
 }
 
 // Sync mesh to player physics state
@@ -1014,12 +1044,12 @@ const gameLoop = new GameLoop(
       enforceMinimumDistance(player1, player2);
 
       // Process input for both players
-      updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt);
+      updatePlayerInput(player1, player2, input.player(0), thrustEffect1, dt, true);
       if (aiController) {
         const aiInput = aiController.update(dt, player2, player1, bulletPool, snotPool);
-        updatePlayerInput(player2, player1, aiInput, thrustEffect2, dt);
+        updatePlayerInput(player2, player1, aiInput, thrustEffect2, dt, false);
       } else {
-        updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt);
+        updatePlayerInput(player2, player1, input.player(1), thrustEffect2, dt, false);
       }
 
       if (player1 instanceof MichiGichiPlayer) {
@@ -1202,8 +1232,8 @@ const gameLoop = new GameLoop(
           const row = Math.floor(fi / ICE_ATLAS_COLS);
           mat.map.offset.set(col / ICE_ATLAS_COLS, 1 - (row + 1) / ICE_ATLAS_ROWS);
         }
-        // Rotate to match heading
-        (sprite.material as THREE.SpriteMaterial).rotation = bullet.angle * (Math.PI / 180);
+        // Rotate to match heading (+PI because atlas sprite tip points down)
+        (sprite.material as THREE.SpriteMaterial).rotation = bullet.angle * (Math.PI / 180) + Math.PI;
       } else if (bullet.config === FROST_SHIELD_CONFIG) {
         // Pulsing glow overlay on ship — no rotation
         const mat = sprite.material as THREE.SpriteMaterial;

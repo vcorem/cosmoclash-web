@@ -55,7 +55,7 @@ export const ICE_BULLET_CONFIG: BulletConfig = {
 export const FROST_SHIELD_CONFIG: BulletConfig = {
   speedMaxScaler: 0,
   maxTtl: 500000,
-  damage: 0.3,
+  damage: 0.5,
   collisionRadius: 11,
   attached: true,
   persistent: true,

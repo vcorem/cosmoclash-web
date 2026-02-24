@@ -183,7 +183,7 @@ describe('Bullet', () => {
     it('has correct frost shield values from C++', () => {
       expect(FROST_SHIELD_CONFIG.speedMaxScaler).toBe(0);
       expect(FROST_SHIELD_CONFIG.maxTtl).toBe(500000);
-      expect(FROST_SHIELD_CONFIG.damage).toBe(0.3);
+      expect(FROST_SHIELD_CONFIG.damage).toBe(0.5);
       expect(FROST_SHIELD_CONFIG.collisionRadius).toBe(11);
       expect(FROST_SHIELD_CONFIG.attached).toBe(true);
       expect(FROST_SHIELD_CONFIG.persistent).toBe(true);

@@ -8,6 +8,7 @@ export const SHOLEV_BASE_ROTATION = 0.5;
 export const SHOLEV_BOOST_SPEED = 1.6;
 export const SHOLEV_BOOST_ROTATION = 1.0;
 export const SHOLEV_MIN_ENERGY_SHIELD = 0.25;
+export const FROST_SHIELD_TOGGLE_COOLDOWN = 2000; // 2 seconds before allowing toggle-off
 const FROST_ENERGY_DRAIN = 0.0003; // per ms, from C++
 
 export const SHOLEV_STATS: CharacterStats = {
@@ -23,6 +24,7 @@ export const SHOLEV_STATS: CharacterStats = {
 export class SholevPlayer extends Player {
   frostShieldActive: boolean = false;
   activeFrostBullet: Bullet | null = null;
+  frostShieldActiveTime: number = 0;
 
   constructor() {
     super({ ...SHOLEV_STATS }); // mutable copy for stat swapping
@@ -34,6 +36,7 @@ export class SholevPlayer extends Player {
     if (this.frostShieldActive) return false;
     if (this.energy < SHOLEV_MIN_ENERGY_SHIELD) return false;
     this.frostShieldActive = true;
+    this.frostShieldActiveTime = 0;
     this.stats.speedMaxScaler = SHOLEV_BOOST_SPEED;
     this.stats.rotationSpeed = SHOLEV_BOOST_ROTATION;
     return true;
@@ -46,6 +49,8 @@ export class SholevPlayer extends Player {
 
   updateFrostShield(dt: number): void {
     if (!this.frostShieldActive || !this.activeFrostBullet) return;
+
+    this.frostShieldActiveTime += dt;
 
     if (!this.activeFrostBullet.alive) {
       this.deactivateFrostShield();
@@ -60,9 +65,21 @@ export class SholevPlayer extends Player {
     }
   }
 
+  /** Manually toggle off the frost shield (called from input handler). Returns true if deactivated. */
+  deactivateFrostShieldManual(): boolean {
+    if (!this.frostShieldActive) return false;
+    if (this.frostShieldActiveTime < FROST_SHIELD_TOGGLE_COOLDOWN) return false;
+    if (this.activeFrostBullet) {
+      this.activeFrostBullet.destroy();
+    }
+    this.deactivateFrostShield();
+    return true;
+  }
+
   private deactivateFrostShield(): void {
     this.frostShieldActive = false;
     this.activeFrostBullet = null;
+    this.frostShieldActiveTime = 0;
     this.stats.speedMaxScaler = SHOLEV_BASE_SPEED;
     this.stats.rotationSpeed = SHOLEV_BASE_ROTATION;
   }

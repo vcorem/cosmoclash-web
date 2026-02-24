@@ -535,7 +535,7 @@ describe('CollisionHandler', () => {
 
       handler.onGameEvent(new BulletHitEvent(bullet, target));
 
-      expect(target.health).toBeCloseTo(0.7); // 1.0 - 0.3
+      expect(target.health).toBeCloseTo(0.5); // 1.0 - 0.5
       expect(bullet.alive).toBe(true); // NOT destroyed
     });
 

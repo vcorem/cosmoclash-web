@@ -7,6 +7,7 @@ import {
   SHOLEV_BOOST_SPEED,
   SHOLEV_BOOST_ROTATION,
   SHOLEV_MIN_ENERGY_SHIELD,
+  FROST_SHIELD_TOGGLE_COOLDOWN,
 } from './SholevPlayer';
 import { ICE_BULLET_CONFIG, FROST_SHIELD_CONFIG, Bullet } from './Bullet';
 import { Player, GONDI_STATS } from './Player';
@@ -130,6 +131,49 @@ describe('SholevPlayer', () => {
       const p = new SholevPlayer();
       p.energy = 1.0;
       p.updateFrostShield(1000);
+      expect(p.energy).toBe(1.0);
+    });
+  });
+
+  describe('deactivateFrostShieldManual', () => {
+    it('destroys the frost bullet and reverts stats after cooldown', () => {
+      const p = new SholevPlayer();
+      p.energy = 1.0;
+      p.activateFrostShield();
+      const bullet = new Bullet(FROST_SHIELD_CONFIG, p);
+      p.setFrostBullet(bullet);
+
+      // Advance past the 2-second cooldown
+      p.updateFrostShield(FROST_SHIELD_TOGGLE_COOLDOWN);
+
+      expect(p.deactivateFrostShieldManual()).toBe(true);
+      expect(p.frostShieldActive).toBe(false);
+      expect(p.activeFrostBullet).toBeNull();
+      expect(bullet.alive).toBe(false);
+      expect(p.stats.speedMaxScaler).toBe(SHOLEV_BASE_SPEED);
+      expect(p.stats.rotationSpeed).toBe(SHOLEV_BASE_ROTATION);
+    });
+
+    it('returns false when toggle cooldown has not elapsed', () => {
+      const p = new SholevPlayer();
+      p.energy = 1.0;
+      p.activateFrostShield();
+      const bullet = new Bullet(FROST_SHIELD_CONFIG, p);
+      p.setFrostBullet(bullet);
+
+      // Only 1 second elapsed — not enough
+      p.updateFrostShield(1000);
+
+      expect(p.deactivateFrostShieldManual()).toBe(false);
+      expect(p.frostShieldActive).toBe(true);
+      expect(bullet.alive).toBe(true);
+    });
+
+    it('does nothing when frost shield is not active', () => {
+      const p = new SholevPlayer();
+      p.energy = 1.0;
+      expect(p.deactivateFrostShieldManual()).toBe(false);
+      expect(p.frostShieldActive).toBe(false);
       expect(p.energy).toBe(1.0);
     });
   });
