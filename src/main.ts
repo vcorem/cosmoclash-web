@@ -437,6 +437,7 @@ let aiDifficulty: DifficultyLevel = 3;
 
 // Gauntlet state — tracks remaining AI ships for consecutive rounds
 let currentP1Def: CharacterDef | null = null;
+let currentP2Def: CharacterDef | null = null;
 let remainingAIShips: CharacterDef[] = [];
 
 // Game state — starts with logo splash
@@ -625,6 +626,7 @@ window.addEventListener('keydown', (e) => {
       // Build gauntlet roster: all ships except the one picked for first round
       const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
       const p2Def = CHARACTER_REGISTRY[p2Index];
+      currentP2Def = p2Def;
       remainingAIShips = CHARACTER_REGISTRY.filter((_, i) => i !== p2Index);
 
       selectionUI.hide();
@@ -958,6 +960,7 @@ const gameLoop = new GameLoop(
         if (hud) { hud.destroy(); hud = null; }
         const nextIndex = Math.floor(Math.random() * remainingAIShips.length);
         const nextP2Def = remainingAIShips[nextIndex];
+        currentP2Def = nextP2Def;
         remainingAIShips.splice(nextIndex, 1);
         startMelee(currentP1Def!, nextP2Def);
         return;
