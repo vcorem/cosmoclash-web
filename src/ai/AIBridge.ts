@@ -158,7 +158,7 @@ function getAngleToXY(toX: number, toY: number, fromX: number, fromY: number): n
   const cosAngle = dy / size;
   const clamped = Math.max(-1, Math.min(1, cosAngle));
   let angle = Math.acos(clamped) * (180 / Math.PI);
-  if (dx < 0) {
+  if (dx > 0) {
     angle = 360 - angle;
   }
   return angle;

@@ -39,7 +39,7 @@ export function getAngleBetweenTwoVectors(
   const dot = (v1.x * v2.x + v1.y * v2.y) / (v1.size * v2.size);
   const clamped = Math.max(-1, Math.min(1, dot));
   let angle = Math.acos(clamped) * RAD_TO_DEG;
-  if (v1.x < 0) {
+  if (v1.x > 0) {
     angle = 360 - angle;
   }
   return angle;

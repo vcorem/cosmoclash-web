@@ -71,16 +71,18 @@ describe('getAngleBetweenTwoVectors', () => {
     expect(getAngleBetweenTwoVectors(v1, v2)).toBeCloseTo(0, 5);
   });
 
-  it('returns 90 for perpendicular vector to the right', () => {
+  it('returns 270 for perpendicular vector to the right (matches -sin physics)', () => {
     const v1 = { x: 1, y: 0, size: 1 };
     const v2 = { x: 0, y: 1, size: 1 };
-    expect(getAngleBetweenTwoVectors(v1, v2)).toBeCloseTo(90, 5);
+    // Positive X → 270° because getFullSpeedVec(-sin(270°))=+1 faces +X
+    expect(getAngleBetweenTwoVectors(v1, v2)).toBeCloseTo(270, 5);
   });
 
-  it('returns 270 for perpendicular vector to the left', () => {
+  it('returns 90 for perpendicular vector to the left (matches -sin physics)', () => {
     const v1 = { x: -1, y: 0, size: 1 };
     const v2 = { x: 0, y: 1, size: 1 };
-    expect(getAngleBetweenTwoVectors(v1, v2)).toBeCloseTo(270, 5);
+    // Negative X → 90° because getFullSpeedVec(-sin(90°))=-1 faces -X
+    expect(getAngleBetweenTwoVectors(v1, v2)).toBeCloseTo(90, 5);
   });
 
   it('returns 180 for opposite vectors', () => {
@@ -102,20 +104,23 @@ describe('getAngleToXY', () => {
     expect(getAngleToXY(0, 100, 0, 0)).toBeCloseTo(0, 5);
   });
 
-  it('returns 90 when target is to the right', () => {
-    expect(getAngleToXY(100, 0, 0, 0)).toBeCloseTo(90, 5);
+  it('returns 270 when target is to the right (matches -sin physics)', () => {
+    // At angle 270°: getFullSpeedVec = (-sin(270°), cos(270°)) = (1, 0) → faces +X
+    expect(getAngleToXY(100, 0, 0, 0)).toBeCloseTo(270, 5);
   });
 
   it('returns 180 when target is directly below', () => {
     expect(getAngleToXY(0, -100, 0, 0)).toBeCloseTo(180, 5);
   });
 
-  it('returns 270 when target is to the left', () => {
-    expect(getAngleToXY(-100, 0, 0, 0)).toBeCloseTo(270, 5);
+  it('returns 90 when target is to the left (matches -sin physics)', () => {
+    // At angle 90°: getFullSpeedVec = (-sin(90°), cos(90°)) = (-1, 0) → faces -X
+    expect(getAngleToXY(-100, 0, 0, 0)).toBeCloseTo(90, 5);
   });
 
-  it('returns 45 for upper-right diagonal', () => {
-    expect(getAngleToXY(100, 100, 0, 0)).toBeCloseTo(45, 5);
+  it('returns 315 for upper-right diagonal (matches -sin physics)', () => {
+    // At angle 315°: getFullSpeedVec = (-sin(315°), cos(315°)) = (0.707, 0.707) → faces +X,+Y
+    expect(getAngleToXY(100, 100, 0, 0)).toBeCloseTo(315, 5);
   });
 });
 
@@ -124,8 +129,9 @@ describe('getVVAngle', () => {
     expect(getVVAngle(0, 1)).toBeCloseTo(0, 5);
   });
 
-  it('returns 90 for velocity pointing right', () => {
-    expect(getVVAngle(1, 0)).toBeCloseTo(90, 5);
+  it('returns 270 for velocity pointing right (matches -sin physics)', () => {
+    // Velocity (1, 0) = moving +X → matches angle 270° where -sin(270°)=1
+    expect(getVVAngle(1, 0)).toBeCloseTo(270, 5);
   });
 
   it('returns 0 for zero velocity', () => {
@@ -196,11 +202,11 @@ describe('goodAim', () => {
 
   it('returns corrected angle when random < probability', () => {
     mathRandomSpy.mockReturnValue(0.1); // 10 < 100 * 1.0
-    const computer = makeTable({ x: 0, y: 0, angleToOp: 45 });
+    const computer = makeTable({ x: 0, y: 0, angleToOp: 315 });
     const user = makeTable({ x: 100, y: 100, dxVector: 0, dyVector: 0 });
     const result = goodAim(computer, user, 1.0);
-    // Should be the angle to (100,100) from (0,0) = 45 degrees
-    expect(result).toBeCloseTo(45, 0);
+    // Angle to (100,100) from (0,0) = 315° (upper-right in -sin physics)
+    expect(result).toBeCloseTo(315, 0);
   });
 
   it('returns angleToOp when random >= probability', () => {
@@ -217,9 +223,10 @@ describe('goodAim', () => {
     // Opponent at (100, 0) moving up (+Y)
     const user = makeTable({ x: 100, y: 0, dxVector: 0, dyVector: 0.01 });
     const result = goodAim(computer, user, 1.0);
-    // Future position will be above (100, 0), so angle should be between 0 and 90
-    expect(result).toBeGreaterThan(0);
-    expect(result).toBeLessThan(90);
+    // Future position will be above (100, 0), so angle should be between 270 and 360
+    // (upper-right quadrant in -sin physics convention)
+    expect(result).toBeGreaterThan(270);
+    expect(result).toBeLessThan(360);
   });
 });
 
