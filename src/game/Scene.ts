@@ -83,6 +83,45 @@ export function createStarField(): THREE.Points {
   return stars;
 }
 
+/**
+ * Scroll star field to follow the camera, wrapping stars that exit the
+ * bounding cube so the field appears infinite. Port of C++ CStarsNode::ScrollCenter.
+ *
+ * Call each frame with the camera movement delta (dx, dy).
+ * The stars group should be positioned at the camera XY each frame.
+ */
+export function scrollStarField(stars: THREE.Points, dx: number, dy: number): void {
+  const positions = (stars.geometry.getAttribute('position') as THREE.BufferAttribute);
+  const arr = positions.array as Float32Array;
+  const halfW = ARENA.STARS_EXTENT * 0.5;
+  const halfH = ARENA.STARS_EXTENT * 0.5;
+
+  for (let i = 0; i < ARENA.NUM_STARS; i++) {
+    const xi = i * 3;
+    const yi = i * 3 + 1;
+
+    // Subtract camera delta so stars stay fixed in world space
+    arr[xi] -= dx;
+    arr[yi] -= dy;
+
+    // Wrap X
+    if (arr[xi] > halfW) {
+      arr[xi] = -halfW + (arr[xi] - halfW);
+    } else if (arr[xi] < -halfW) {
+      arr[xi] = halfW - (-halfW - arr[xi]);
+    }
+
+    // Wrap Y
+    if (arr[yi] > halfH) {
+      arr[yi] = -halfH + (arr[yi] - halfH);
+    } else if (arr[yi] < -halfH) {
+      arr[yi] = halfH - (-halfH - arr[yi]);
+    }
+  }
+
+  positions.needsUpdate = true;
+}
+
 export function createRenderer(parent: HTMLElement): THREE.WebGLRenderer {
   const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
   renderer.setSize(parent.clientWidth, parent.clientHeight);

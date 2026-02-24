@@ -17,7 +17,7 @@ import { CollisionHandler, enforceMinimumDistance } from '@/game/CollisionHandle
 import { GameEventMgr, GameEventListener } from '@/engine/GameEventMgr';
 import { GameEvent, GameEventType, ExplosionEvent } from '@/engine/GameEvent';
 import { Explosion } from '@/game/Explosion';
-import { createScene, createStarField, createRenderer } from '@/game/Scene';
+import { createScene, createStarField, createRenderer, scrollStarField } from '@/game/Scene';
 import { createCamera, CameraController } from '@/game/Camera';
 import { Sun } from '@/game/Sun';
 import { applySunGravity } from '@/game/Gravity';
@@ -48,6 +48,8 @@ const camera = createCamera();
 const renderer = createRenderer(container);
 const stars = createStarField();
 scene.add(stars);
+let prevStarCamX = 0;
+let prevStarCamY = 0;
 
 // Resize handling
 window.addEventListener('resize', () => {
@@ -671,8 +673,10 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
     thrustEffect2.setColor(1, 1, 1);
   }
 
-  // Reset camera zoom
+  // Reset camera zoom and star scroll tracking
   cameraController.reset(camera);
+  prevStarCamX = camera.position.x;
+  prevStarCamY = camera.position.y;
 
   gameState = 'playing';
   SoundManager.getInstance().playMusic('battle');
@@ -1310,8 +1314,13 @@ const gameLoop = new GameLoop(
 
     entityManager.removeDeadEntities();
 
-    // Parallax: stars scroll at 80% of camera speed for depth effect
-    stars.position.set(camera.position.x * 0.8, camera.position.y * 0.8, ARENA.STARS_Z);
+    // Infinite star field: center cube on camera, scroll & wrap vertices (C++ CStarsNode::ScrollCenter)
+    const dx = camera.position.x - prevStarCamX;
+    const dy = camera.position.y - prevStarCamY;
+    scrollStarField(stars, dx, dy);
+    stars.position.set(camera.position.x, camera.position.y, ARENA.STARS_Z);
+    prevStarCamX = camera.position.x;
+    prevStarCamY = camera.position.y;
 
     // HUD update every frame
     if (hud) {
