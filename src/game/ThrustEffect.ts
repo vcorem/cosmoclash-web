@@ -49,6 +49,7 @@ export class ThrustEffect {
       uniforms: {
         map: { value: texture },
         pointSize: { value: THRUST_CONFIG.PARTICLE_SIZE },
+        color: { value: new THREE.Color(1, 1, 1) },
       },
       vertexShader: `
         attribute float opacity;
@@ -63,10 +64,11 @@ export class ThrustEffect {
       `,
       fragmentShader: `
         uniform sampler2D map;
+        uniform vec3 color;
         varying float vOpacity;
         void main() {
           vec4 texColor = texture2D(map, gl_PointCoord);
-          gl_FragColor = vec4(texColor.rgb, texColor.a * vOpacity);
+          gl_FragColor = vec4(texColor.rgb * color, texColor.a * vOpacity);
         }
       `,
       transparent: true,
@@ -148,6 +150,11 @@ export class ThrustEffect {
     this.ages[i] = 0;
     this.lifetimes[i] = THRUST_CONFIG.MIN_LIFETIME +
       Math.random() * (THRUST_CONFIG.MAX_LIFETIME - THRUST_CONFIG.MIN_LIFETIME);
+  }
+
+  setColor(r: number, g: number, b: number): void {
+    const mat = this.points.material as THREE.ShaderMaterial;
+    (mat.uniforms.color.value as THREE.Color).setRGB(r, g, b);
   }
 
   dispose(): void {

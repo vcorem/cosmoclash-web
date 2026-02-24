@@ -11,6 +11,7 @@ import { Entity, EntityType } from '@/engine/Entity';
 import { EntityPool } from '@/engine/EntityPool';
 import { InputManager, PlayerInput } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
+import { FrostTrailEffect } from '@/game/FrostTrailEffect';
 import { CollisionDetector } from '@/engine/CollisionDetector';
 import { CollisionHandler, enforceMinimumDistance } from '@/game/CollisionHandler';
 import { GameEventMgr, GameEventListener } from '@/engine/GameEventMgr';
@@ -255,6 +256,12 @@ const thrustEffect1 = new ThrustEffect(thrustTexture);
 const thrustEffect2 = new ThrustEffect(thrustTexture);
 scene.add(thrustEffect1.points);
 scene.add(thrustEffect2.points);
+
+// Frost trail particle effects (one per player, active when frost shield is on)
+const frostTrail1 = new FrostTrailEffect(frostShieldTexture);
+const frostTrail2 = new FrostTrailEffect(frostShieldTexture);
+scene.add(frostTrail1.points);
+scene.add(frostTrail2.points);
 
 // Sun mesh — animated sphere with sprite sheet atlas
 const SUN_ATLAS_COLS = 8;
@@ -660,6 +667,18 @@ function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
   // Show melee HUD
   hud = new HUD(container);
 
+  // Set thrust colors based on character (Sholev = icy blue-white, others = default white)
+  if (p1Def.id === 'sholev') {
+    thrustEffect1.setColor(0.5, 0.8, 1.0);
+  } else {
+    thrustEffect1.setColor(1, 1, 1);
+  }
+  if (p2Def.id === 'sholev') {
+    thrustEffect2.setColor(0.5, 0.8, 1.0);
+  } else {
+    thrustEffect2.setColor(1, 1, 1);
+  }
+
   // Reset camera zoom
   cameraController.reset(camera);
 
@@ -1017,6 +1036,12 @@ const gameLoop = new GameLoop(
         player2.updateFrostShield(dt);
       }
 
+      // Frost trail particles (world-space trail behind ship when shield is active)
+      const p1FrostActive = player1 instanceof SholevPlayer && player1.frostShieldActive;
+      const p2FrostActive = player2 instanceof SholevPlayer && player2.frostShieldActive;
+      frostTrail1.update(dt, p1FrostActive, player1.position.x, player1.position.y);
+      frostTrail2.update(dt, p2FrostActive, player2.position.x, player2.position.y);
+
       // Update entities
       entityManager.update(dt, camCenter);
 
@@ -1180,10 +1205,12 @@ const gameLoop = new GameLoop(
         // Rotate to match heading
         (sprite.material as THREE.SpriteMaterial).rotation = bullet.angle * (Math.PI / 180);
       } else if (bullet.config === FROST_SHIELD_CONFIG) {
-        // Slowly rotate frost shield sprite
+        // Pulsing glow overlay on ship — no rotation
         const mat = sprite.material as THREE.SpriteMaterial;
+        mat.rotation = 0;
         const elapsed = bullet.config.maxTtl - bullet.ttl;
-        mat.rotation = elapsed * 0.003;
+        const pulse = 0.6 + 0.4 * Math.sin(elapsed * 0.005);
+        mat.opacity = pulse;
       }
     });
     bulletPool.releaseInactive();

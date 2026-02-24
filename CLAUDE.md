@@ -67,8 +67,9 @@ Neo, Orca, Ptera, Lepid, Gondi, Tiktok, Sholev, Phyto — each with unique speed
 - `Player.resetForNewRound(spawnPos)` resets all player state for round restart
 - Debug keys: press `1`/`2` to instantly kill player 1/2 with explosion (gated on playing state)
 - MichiGichiPlayer (`src/game/MichiGichiPlayer.ts`): extends Player with 4-state morph machine (MICHI ↔ GICHI). MICHI form = slow (0.2 speed), plasma weapon. GICHI form = fast (1.0 speed), sun weapon. Secondary weapon triggers morph (no projectile). 20ms frame delay × 42 frames ≈ 840ms transition. Two collision spheres: (0,-10,0) r14 and (0,10,0) r14
-- BulletConfig optional fields: `tracking?`, `expandingRadius?`, `decayingDamage?` — Bullet.update() applies dynamic behaviors when present. `getCurrentDamage()` returns decaying or flat damage. Bullet-bullet collisions are skipped entirely (matches C++ CBullet::VerifyCollision)
-- Player types driven by CharacterDef selection: `loadPlayerModel(charDef)` creates correct player type (MichiGichiPlayer or Player) and loads model. Both P1 and P2 support morph (symmetric p1Mixer/p2Mixer). Players are `let` (reassigned each round based on selection)
+- BulletConfig optional fields: `tracking?`, `expandingRadius?`, `decayingDamage?`, `persistent?`, `hitRateLimit?`, `attached?` — Bullet.update() applies dynamic behaviors when present. `getCurrentDamage()` returns decaying or flat damage. Bullet-bullet collisions are skipped entirely (matches C++ CBullet::VerifyCollision). Persistent bullets survive hits and rate-limit damage via `damageCooldown`
+- SholevPlayer (`src/game/SholevPlayer.ts`): extends Player with frost shield mechanic. Primary weapon: ice shards (animated 9×8 atlas, 65 frames). Secondary weapon: frost shield — persistent attached bullet with collision damage, energy drain (0.0003/ms), stat boost (speed 0.8→1.6, rotation 0.5→1.0), min energy 0.25 to activate. Thrust hidden while shield active. `FrostTrailEffect` creates dense trail of shrinking shield sprites behind ship. `ThrustEffect.setColor()` tints Sholev thrust particles blue-white
+- Player types driven by CharacterDef selection: `loadPlayerModel(charDef)` creates correct player type (MichiGichiPlayer, SholevPlayer, or Player) and loads model. Both P1 and P2 support morph (symmetric p1Mixer/p2Mixer). Players are `let` (reassigned each round based on selection)
 
 **Sound system:** `SoundManager` singleton (Web Audio API) in `src/audio/`. 14 SFX + 2 music tracks preloaded as AudioBuffers. `SoundEventListener` implements `GameEventListener` for collision sounds (BulletHit→Hit/AsteroidHit, Explosion→ExplosionBig/Explosion, SunCollision→SunBoom, SnotHit→SnotHit). Direct calls in main.ts for weapon fire (from `BulletConfig.sound`), morph, snot, and music transitions. M key toggles mute. Volume/mute persisted in localStorage.
 
@@ -112,6 +113,6 @@ texture.offset.set(col / cols, 1 - (row + 1) / rows);
 
 ```bash
 npm run dev          # Start dev server
-npx vitest run       # Run all tests (924 tests)
+npx vitest run       # Run all tests (531 tests)
 npx tsc --noEmit     # Type check
 ```

@@ -20,11 +20,15 @@ vi.mock('three', () => {
       material,
     })
   );
+  const Color = vi.fn().mockImplementation(() => ({
+    setRGB: vi.fn(),
+  }));
   return {
     BufferAttribute,
     BufferGeometry,
     ShaderMaterial,
     Points,
+    Color,
     AdditiveBlending: 2,
   };
 });
