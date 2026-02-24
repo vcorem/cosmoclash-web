@@ -458,6 +458,12 @@ let mainMenu: MainMenu | null = null;
 let difficultyUI: DifficultyUI | null = null;
 
 function showMainMenu(): void {
+  // Reset gauntlet/fleet state so a new game starts fresh
+  currentP1Def = null;
+  currentP2Def = null;
+  usedP1Ships = new Set();
+  remainingAIShips = [];
+
   mainMenu = new MainMenu(container, () => {
     mainMenu!.destroy();
     mainMenu = null;
