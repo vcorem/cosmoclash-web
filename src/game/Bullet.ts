@@ -1,4 +1,5 @@
 import { Entity, EntityType } from '@/engine/Entity';
+import { ARENA } from '@/game/Arena';
 import { SoundEffect } from '@/audio/SoundEffect';
 
 export interface BulletConfig {
@@ -10,6 +11,7 @@ export interface BulletConfig {
   expandingRadius?: { min: number; max: number };
   decayingDamage?: { initial: number };
   sound?: SoundEffect;
+  attached?: boolean;
 }
 
 export const FLAME_BULLET_CONFIG: BulletConfig = {
@@ -18,6 +20,7 @@ export const FLAME_BULLET_CONFIG: BulletConfig = {
   damage: 0.05,
   collisionRadius: 10,
   sound: SoundEffect.FlameShot,
+  attached: true,
 };
 
 export const PLASMA_BULLET_CONFIG: BulletConfig = {
@@ -46,6 +49,8 @@ export class Bullet extends Entity {
   trackingTarget: Entity | null = null;
   animFrame: number = 0;
   animSpeed: number = 0;
+  localOffsetDistance: number = 0;
+  attachedSpeed: number = 0;
 
   constructor(config: BulletConfig, originEntity: Entity | null = null) {
     super();
@@ -69,6 +74,8 @@ export class Bullet extends Entity {
     this.trackingTarget = null;
     this.animFrame = 0;
     this.animSpeed = 0;
+    this.localOffsetDistance = 0;
+    this.attachedSpeed = 0;
     this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: config.collisionRadius }];
   }
 
@@ -81,6 +88,22 @@ export class Bullet extends Entity {
   }
 
   update(dt: number): void {
+    // Attached bullets (flame): follow origin entity, extending forward over time
+    if (this.config.attached && this.originEntity && this.originEntity.alive) {
+      this.localOffsetDistance += this.attachedSpeed * dt * ARENA.TIME_SCALER;
+      const rad = this.originEntity.angle * (Math.PI / 180);
+      this.position.x = this.originEntity.position.x + (-Math.sin(rad)) * this.localOffsetDistance;
+      this.position.y = this.originEntity.position.y + Math.cos(rad) * this.localOffsetDistance;
+      this.position.z = this.originEntity.position.z;
+      this.previousPosition = { ...this.position };
+
+      this.ttl -= dt;
+      if (this.ttl <= 0) {
+        this.destroy();
+      }
+      return;
+    }
+
     if (this.config.tracking && this.trackingTarget && this.trackingTarget.alive) {
       const speed = Math.sqrt(
         this.accelVec.x * this.accelVec.x + this.accelVec.y * this.accelVec.y,

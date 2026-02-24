@@ -142,8 +142,29 @@ function loadPlayerModel(
   );
 }
 
-// Load flame texture
-const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg');
+// Load flame texture — derive alpha from luminance and tint warm orange
+// (JPG has no alpha; without this, additive blending shows a bright white rectangle)
+const flameTexture = new THREE.TextureLoader().load('/textures/GondiFire.jpg', (tex) => {
+  const img = tex.image as HTMLImageElement;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, c.width, c.height);
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const luminance = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    d[i + 3] = Math.min(255, luminance * 2);
+    // Tint toward warm orange (matching C++ particle colors: red to pink)
+    d[i]     = Math.min(255, d[i] * 1.1);       // keep red strong
+    d[i + 1] = Math.floor(d[i + 1] * 0.55);     // reduce green
+    d[i + 2] = Math.floor(d[i + 2] * 0.15);     // cut blue heavily
+  }
+  ctx.putImageData(imageData, 0, 0);
+  (tex as unknown as { image: HTMLCanvasElement }).image = c;
+  tex.needsUpdate = true;
+});
 let plasmaAtlasImage: HTMLImageElement | null = null;
 new THREE.TextureLoader().load('/textures/plasma_atlas.png', (tex) => {
   plasmaAtlasImage = tex.image as HTMLImageElement;
@@ -797,6 +818,11 @@ function updatePlayerInput(
       bullet.previousPosition = { ...bullet.position };
       const speedVec = player.getFullSpeedVec(player.stats.primaryBulletConfig.speedMaxScaler);
       bullet.accelVec = { ...speedVec };
+
+      if (bullet.config.attached) {
+        bullet.attachedSpeed = player.stats.primaryBulletConfig.speedMaxScaler;
+        bullet.localOffsetDistance = 25;
+      }
     }
   }
 
@@ -1066,7 +1092,17 @@ const gameLoop = new GameLoop(
       if (!sprite) return;
       sprite.position.set(bullet.position.x, bullet.position.y, bullet.position.z);
 
-      if (bullet.config === PLASMA_BULLET_CONFIG) {
+      if (bullet.config === FLAME_BULLET_CONFIG) {
+        const mat = sprite.material as THREE.SpriteMaterial;
+        const elapsed = bullet.config.maxTtl - bullet.ttl;
+        // Spin each flame sprite — unique phase per bullet + continuous rotation
+        mat.rotation = bullet.id * 1.7 + elapsed * 0.008;
+        // Grow in quickly (100ms), fade out over last 200ms
+        const growIn = Math.min(elapsed / 100, 1);
+        const fadeOut = Math.min(bullet.ttl / 200, 1);
+        const size = 35 * growIn * fadeOut;
+        sprite.scale.set(size, size, 1);
+      } else if (bullet.config === PLASMA_BULLET_CONFIG) {
         // Advance animation: m_curTex += m_AnimSpeed * dt (matching C++ Render)
         bullet.animFrame += bullet.animSpeed * dt;
         if (bullet.animFrame > 41) {
