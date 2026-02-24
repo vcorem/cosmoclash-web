@@ -32,6 +32,7 @@ export class SelectionScene {
   private waveTime: number = 0;
   private flyAnims: { group: THREE.Group; startZ: number; endZ: number; elapsed: number }[] = [];
   private camFly: { startX: number; endX: number; elapsed: number } | null = null;
+  private disabledIds: Set<string> = new Set();
 
   constructor(aspect = 4 / 3) {
     this.scene = new THREE.Scene();
@@ -151,6 +152,18 @@ export class SelectionScene {
     });
   }
 
+  setDisabledShips(ids: Set<string>): void {
+    this.disabledIds = ids;
+    // Hide disabled ships visually
+    CHARACTER_REGISTRY.forEach((charDef, i) => {
+      const group = this.shipGroups[i];
+      if (!group) return;
+      if (this.disabledIds.has(charDef.id)) {
+        group.visible = false;
+      }
+    });
+  }
+
   private getShipX(index: number): number {
     const totalWidth = (CHARACTER_REGISTRY.length - 1) * SHIP_SPACING;
     return -totalWidth / 2 + index * SHIP_SPACING;
@@ -158,13 +171,25 @@ export class SelectionScene {
 
   selectNext(): void {
     if (this.state === SelectionState.DONE) return;
-    this.currentIndex = (this.currentIndex + 1) % CHARACTER_REGISTRY.length;
+    const len = CHARACTER_REGISTRY.length;
+    let next = (this.currentIndex + 1) % len;
+    for (let i = 0; i < len; i++) {
+      if (!this.disabledIds.has(CHARACTER_REGISTRY[next].id)) break;
+      next = (next + 1) % len;
+    }
+    this.currentIndex = next;
     this.triggerFlyAnimation();
   }
 
   selectPrev(): void {
     if (this.state === SelectionState.DONE) return;
-    this.currentIndex = (this.currentIndex - 1 + CHARACTER_REGISTRY.length) % CHARACTER_REGISTRY.length;
+    const len = CHARACTER_REGISTRY.length;
+    let prev = (this.currentIndex - 1 + len) % len;
+    for (let i = 0; i < len; i++) {
+      if (!this.disabledIds.has(CHARACTER_REGISTRY[prev].id)) break;
+      prev = (prev - 1 + len) % len;
+    }
+    this.currentIndex = prev;
     this.triggerFlyAnimation();
   }
 

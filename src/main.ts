@@ -489,6 +489,7 @@ function showSelectionScreen(): void {
 function showSelectionScreenForFleet(): void {
   selectionScene = new SelectionScene();
   selectionScene.state = SelectionState.SELECTING_P1;
+  selectionScene.setDisabledShips(usedP1Ships);
   // Start browsing at first available (non-used) ship
   const firstAvailable = CHARACTER_REGISTRY.findIndex(c => !usedP1Ships.has(c.id));
   if (firstAvailable >= 0) {
