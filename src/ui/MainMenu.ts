@@ -18,6 +18,11 @@ export class MainMenu {
     playBtn.addEventListener('click', () => this.play());
     this.root.appendChild(playBtn);
 
+    const credits = document.createElement('div');
+    credits.className = 'menu-credits';
+    credits.textContent = 'Made by Ori Hanegby, Guy Corem, Orr Kowarsky';
+    this.root.appendChild(credits);
+
     parent.appendChild(this.root);
 
     this.keyHandler = (e: KeyboardEvent) => {

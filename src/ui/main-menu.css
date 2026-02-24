@@ -34,3 +34,14 @@
   text-shadow: 0 0 20px rgba(100, 200, 255, 1);
   color: #ffffff;
 }
+
+#main-menu .menu-credits {
+  position: absolute;
+  bottom: 16px;
+  left: 20px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: rgba(150, 170, 210, 0.6);
+  text-shadow: 0 0 6px rgba(60, 100, 180, 0.3);
+}
