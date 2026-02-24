@@ -10,6 +10,7 @@ export class SelectionUI {
   private weaponValue: Text;
   private specialLabel: HTMLSpanElement;
   private specialValue: Text;
+  private remainingEl: HTMLDivElement;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -47,9 +48,14 @@ export class SelectionUI {
     controls.className = 'selection-controls';
     controls.textContent = '\u2190 \u2192 Browse  |  Enter to Select';
 
+    this.remainingEl = document.createElement('div');
+    this.remainingEl.className = 'selection-remaining';
+    this.remainingEl.style.display = 'none';
+
     panel.appendChild(this.nameEl);
     panel.appendChild(weaponEl);
     panel.appendChild(specialEl);
+    panel.appendChild(this.remainingEl);
     panel.appendChild(controls);
 
     this.root.appendChild(this.header);
@@ -64,6 +70,15 @@ export class SelectionUI {
     this.weaponValue.textContent = character.weapon;
     this.specialValue.textContent = character.special;
     this.root.style.display = '';
+  }
+
+  showRemaining(count: number): void {
+    if (count > 0) {
+      this.remainingEl.textContent = `${count} ship${count === 1 ? '' : 's'} remaining`;
+      this.remainingEl.style.display = '';
+    } else {
+      this.remainingEl.style.display = 'none';
+    }
   }
 
   hide(): void {

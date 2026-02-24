@@ -497,6 +497,8 @@ function showSelectionScreenForFleet(): void {
   }
   selectionUI = new SelectionUI(container);
   selectionUI.show(1, selectionScene.getCurrentCharacter());
+  const remaining = CHARACTER_REGISTRY.filter(c => !usedP1Ships.has(c.id)).length;
+  selectionUI.showRemaining(remaining);
   gameState = 'selection';
   SoundManager.getInstance().playMusic('intro');
 }
