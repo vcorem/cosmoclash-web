@@ -164,6 +164,23 @@ export class SelectionScene {
     });
   }
 
+  /** Immediately position camera and ships for the given index (no animation). */
+  jumpToIndex(index: number): void {
+    this.currentIndex = index;
+    // Position all ships: selected at front, others at back
+    for (let i = 0; i < this.shipGroups.length; i++) {
+      const group = this.shipGroups[i];
+      if (!group) continue;
+      group.position.z = i === index ? SHIP_FRONT_Z : SHIP_BACK_Z;
+    }
+    // Snap camera to selected ship
+    const targetX = this.getShipX(index);
+    this.camera.position.x = targetX;
+    this.camera.lookAt(targetX, 0, 0);
+    this.flyAnims = [];
+    this.camFly = null;
+  }
+
   private getShipX(index: number): number {
     const totalWidth = (CHARACTER_REGISTRY.length - 1) * SHIP_SPACING;
     return -totalWidth / 2 + index * SHIP_SPACING;
@@ -177,6 +194,7 @@ export class SelectionScene {
       if (!this.disabledIds.has(CHARACTER_REGISTRY[next].id)) break;
       next = (next + 1) % len;
     }
+    if (this.disabledIds.has(CHARACTER_REGISTRY[next].id)) return; // all disabled
     this.currentIndex = next;
     this.triggerFlyAnimation();
   }
@@ -189,6 +207,7 @@ export class SelectionScene {
       if (!this.disabledIds.has(CHARACTER_REGISTRY[prev].id)) break;
       prev = (prev - 1 + len) % len;
     }
+    if (this.disabledIds.has(CHARACTER_REGISTRY[prev].id)) return; // all disabled
     this.currentIndex = prev;
     this.triggerFlyAnimation();
   }

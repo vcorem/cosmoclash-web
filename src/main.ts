@@ -496,10 +496,10 @@ function showSelectionScreenForFleet(): void {
   selectionScene = new SelectionScene();
   selectionScene.state = SelectionState.SELECTING_P1;
   selectionScene.setDisabledShips(usedP1Ships);
-  // Start browsing at first available (non-used) ship
+  // Start browsing at first available (non-used) ship with camera snap
   const firstAvailable = CHARACTER_REGISTRY.findIndex(c => !usedP1Ships.has(c.id));
   if (firstAvailable >= 0) {
-    selectionScene.currentIndex = firstAvailable;
+    selectionScene.jumpToIndex(firstAvailable);
   }
   selectionUI = new SelectionUI(container);
   selectionUI.show(1, selectionScene.getCurrentCharacter());
