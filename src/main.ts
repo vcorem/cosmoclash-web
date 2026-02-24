@@ -439,6 +439,11 @@ let aiDifficulty: DifficultyLevel = 3;
 let currentP1Def: CharacterDef | null = null;
 let currentP2Def: CharacterDef | null = null;
 let remainingAIShips: CharacterDef[] = [];
+let usedP1Ships: Set<string> = new Set();
+
+function hasRemainingP1Ships(): boolean {
+  return CHARACTER_REGISTRY.some(c => !usedP1Ships.has(c.id));
+}
 
 // Game state — starts with logo splash
 type GameState = 'logo' | 'menu' | 'difficulty' | 'selection' | 'playing' | 'gameOver';
@@ -622,6 +627,7 @@ window.addEventListener('keydown', (e) => {
       // P1 confirms — assign random P2 and start gauntlet
       const p1Def = selectionScene.getCurrentCharacter();
       currentP1Def = p1Def;
+      usedP1Ships = new Set();
 
       // Build gauntlet roster: all ships except the one picked for first round
       const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
@@ -946,6 +952,10 @@ const gameLoop = new GameLoop(
         gameState = 'gameOver';
         winnerNum = player1.alive ? 1 : 2;
         gameOverDelay = 0;
+        // Track used P1 ship when P1 dies
+        if (winnerNum === 2 && currentP1Def) {
+          usedP1Ships.add(currentP1Def.id);
+        }
       }
     } else if (gameState === 'gameOver') {
       // gameOver: accumulate delay, show winner after explosion
