@@ -12,6 +12,8 @@ export interface BulletConfig {
   decayingDamage?: { initial: number };
   sound?: SoundEffect;
   attached?: boolean;
+  persistent?: boolean;       // bullet survives hits (not destroyed in CollisionHandler)
+  hitRateLimit?: number;      // minimum ms between damage applications
 }
 
 export const FLAME_BULLET_CONFIG: BulletConfig = {
@@ -42,6 +44,25 @@ export const SUN_BULLET_CONFIG: BulletConfig = {
   sound: SoundEffect.SunShot,
 };
 
+export const ICE_BULLET_CONFIG: BulletConfig = {
+  speedMaxScaler: 1.5,
+  maxTtl: 700,
+  damage: 0.03,
+  collisionRadius: 1,
+  sound: SoundEffect.IceShot,
+};
+
+export const FROST_SHIELD_CONFIG: BulletConfig = {
+  speedMaxScaler: 0,
+  maxTtl: 500000,
+  damage: 0.3,
+  collisionRadius: 11,
+  attached: true,
+  persistent: true,
+  hitRateLimit: 500,
+  sound: SoundEffect.FrostShot,
+};
+
 export class Bullet extends Entity {
   config: BulletConfig;
   originEntity: Entity | null;
@@ -51,6 +72,7 @@ export class Bullet extends Entity {
   animSpeed: number = 0;
   localOffsetDistance: number = 0;
   attachedSpeed: number = 0;
+  damageCooldown: number = 0;
 
   constructor(config: BulletConfig, originEntity: Entity | null = null) {
     super();
@@ -76,6 +98,7 @@ export class Bullet extends Entity {
     this.animSpeed = 0;
     this.localOffsetDistance = 0;
     this.attachedSpeed = 0;
+    this.damageCooldown = 0;
     this.collisionSpheres = [{ offset: { x: 0, y: 0, z: 0 }, radius: config.collisionRadius }];
   }
 
@@ -88,6 +111,10 @@ export class Bullet extends Entity {
   }
 
   update(dt: number): void {
+    if (this.damageCooldown > 0) {
+      this.damageCooldown = Math.max(0, this.damageCooldown - dt);
+    }
+
     // Attached bullets (flame): follow origin entity, extending forward over time
     if (this.config.attached && this.originEntity && this.originEntity.alive) {
       this.localOffsetDistance += this.attachedSpeed * dt * ARENA.TIME_SCALER;
