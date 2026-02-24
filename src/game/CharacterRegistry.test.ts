@@ -32,7 +32,13 @@ describe('CharacterRegistry', () => {
     expect(gondi.special).toBe('Space Slime');
   });
 
-  it('has exactly 2 characters', () => {
-    expect(CHARACTER_REGISTRY).toHaveLength(2);
+  it('Sholev has correct weapon/special', () => {
+    const sholev = CHARACTER_REGISTRY.find(c => c.id === 'sholev')!;
+    expect(sholev.weapon).toBe('Ice Cones');
+    expect(sholev.special).toBe('Ramming Energy');
+  });
+
+  it('has exactly 3 characters', () => {
+    expect(CHARACTER_REGISTRY).toHaveLength(3);
   });
 });

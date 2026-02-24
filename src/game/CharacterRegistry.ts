@@ -30,4 +30,14 @@ export const CHARACTER_REGISTRY: CharacterDef[] = [
     modelRotation: [0, 270, 90],
     isMichiGichi: false,
   },
+  {
+    id: 'sholev',
+    name: 'Sholev',
+    weapon: 'Ice Cones',
+    special: 'Ramming Energy',
+    modelPath: '/models/sholev.glb',
+    modelScale: 2.0,
+    modelRotation: [-90, 0, 0],
+    isMichiGichi: false,
+  },
 ];
