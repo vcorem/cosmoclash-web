@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionHandler, enforceMinimumDistance } from './CollisionHandler';
 import { Entity, EntityType } from '@/engine/Entity';
-import { Bullet, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG } from './Bullet';
+import { Bullet, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, FROST_SHIELD_CONFIG } from './Bullet';
 import { Asteroid } from './Asteroid';
 import { Snot } from './Snot';
 import { Player, GONDI_STATS } from './Player';
@@ -523,6 +523,53 @@ describe('CollisionHandler', () => {
       handler.onGameEvent(event);
 
       expect(target.health).toBeCloseTo(1 - 0.15);
+    });
+  });
+
+  describe('persistent bullet (frost shield)', () => {
+    it('applies damage but does not destroy the bullet', () => {
+      const bullet = new Bullet(FROST_SHIELD_CONFIG);
+      bullet.originEntity = new Entity();
+      const target = new Player(GONDI_STATS);
+      target.health = 1.0;
+
+      handler.onGameEvent(new BulletHitEvent(bullet, target));
+
+      expect(target.health).toBeCloseTo(0.7); // 1.0 - 0.3
+      expect(bullet.alive).toBe(true); // NOT destroyed
+    });
+
+    it('sets damageCooldown from hitRateLimit after hit', () => {
+      const bullet = new Bullet(FROST_SHIELD_CONFIG);
+      bullet.originEntity = new Entity();
+      const target = new Player(GONDI_STATS);
+
+      handler.onGameEvent(new BulletHitEvent(bullet, target));
+
+      expect(bullet.damageCooldown).toBe(500);
+    });
+
+    it('skips damage when damageCooldown > 0', () => {
+      const bullet = new Bullet(FROST_SHIELD_CONFIG);
+      bullet.originEntity = new Entity();
+      bullet.damageCooldown = 100;
+      const target = new Player(GONDI_STATS);
+      target.health = 1.0;
+
+      handler.onGameEvent(new BulletHitEvent(bullet, target));
+
+      expect(target.health).toBe(1.0); // no damage applied
+      expect(bullet.alive).toBe(true);
+    });
+
+    it('still destroys non-persistent bullets normally', () => {
+      const bullet = new Bullet(FLAME_BULLET_CONFIG);
+      bullet.originEntity = new Entity();
+      const target = new Player(GONDI_STATS);
+
+      handler.onGameEvent(new BulletHitEvent(bullet, target));
+
+      expect(bullet.alive).toBe(false); // destroyed as usual
     });
   });
 

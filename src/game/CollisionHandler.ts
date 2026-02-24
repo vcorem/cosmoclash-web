@@ -32,6 +32,11 @@ export class CollisionHandler implements GameEventListener {
     const bullet = event.bullet as Bullet;
     const target = event.target;
 
+    // Persistent bullets (frost shield): skip entirely while on cooldown
+    if (bullet.config.persistent && bullet.damageCooldown > 0) {
+      return;
+    }
+
     // Sun is indestructible — bullets die on contact but deal no damage
     if (target.entityType === EntityType.Sun) {
       // no damage
@@ -49,7 +54,12 @@ export class CollisionHandler implements GameEventListener {
       }
     }
 
-    bullet.destroy();
+    if (bullet.config.persistent) {
+      // Persistent bullets survive hits — set cooldown instead of destroying
+      bullet.damageCooldown = bullet.config.hitRateLimit ?? 0;
+    } else {
+      bullet.destroy();
+    }
   }
 
   private handleShipCollision(event: CollisionEvent): void {
