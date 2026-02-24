@@ -486,6 +486,20 @@ function showSelectionScreen(): void {
   gameState = 'selection';
 }
 
+function showSelectionScreenForFleet(): void {
+  selectionScene = new SelectionScene();
+  selectionScene.state = SelectionState.SELECTING_P1;
+  // Start browsing at first available (non-used) ship
+  const firstAvailable = CHARACTER_REGISTRY.findIndex(c => !usedP1Ships.has(c.id));
+  if (firstAvailable >= 0) {
+    selectionScene.currentIndex = firstAvailable;
+  }
+  selectionUI = new SelectionUI(container);
+  selectionUI.show(1, selectionScene.getCurrentCharacter());
+  gameState = 'selection';
+  SoundManager.getInstance().playMusic('intro');
+}
+
 // Logo splash → main menu
 new LogoSplash(container, () => showMainMenu());
 
@@ -624,19 +638,27 @@ window.addEventListener('keydown', (e) => {
       selectionUI.show(1, selectionScene.getCurrentCharacter());
       break;
     case 'Enter': {
-      // P1 confirms — assign random P2 and start gauntlet
       const p1Def = selectionScene.getCurrentCharacter();
-      currentP1Def = p1Def;
-      usedP1Ships = new Set();
 
-      // Build gauntlet roster: all ships except the one picked for first round
-      const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
-      const p2Def = CHARACTER_REGISTRY[p2Index];
-      currentP2Def = p2Def;
-      remainingAIShips = CHARACTER_REGISTRY.filter((_, i) => i !== p2Index);
+      // Check if this is a fleet re-selection (returning after P1 death)
+      if (currentP2Def && usedP1Ships.size > 0) {
+        // Fleet re-selection: fight same AI opponent
+        currentP1Def = p1Def;
+        selectionUI.hide();
+        startMelee(p1Def, currentP2Def);
+      } else {
+        // Fresh gauntlet start
+        currentP1Def = p1Def;
+        usedP1Ships = new Set();
 
-      selectionUI.hide();
-      startMelee(p1Def, p2Def);
+        const p2Index = Math.floor(Math.random() * CHARACTER_REGISTRY.length);
+        const p2Def = CHARACTER_REGISTRY[p2Index];
+        currentP2Def = p2Def;
+        remainingAIShips = CHARACTER_REGISTRY.filter((_, i) => i !== p2Index);
+
+        selectionUI.hide();
+        startMelee(p1Def, p2Def);
+      }
       break;
     }
   }
@@ -706,6 +728,9 @@ window.addEventListener('keydown', () => {
   // Gauntlet auto-advances — ignore keypresses while waiting
   const gauntletContinues = winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
   if (gauntletContinues) return;
+
+  const fleetContinues = winnerNum === 2 && hasRemainingP1Ships() && currentP2Def !== null;
+  if (fleetContinues) return;
 
   cleanupRound();
   if (hud) {
@@ -958,13 +983,15 @@ const gameLoop = new GameLoop(
         }
       }
     } else if (gameState === 'gameOver') {
-      // gameOver: accumulate delay, show winner after explosion
       gameOverDelay += dt;
       const gauntletContinues = winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
+      const fleetContinues = winnerNum === 2 && hasRemainingP1Ships() && currentP2Def !== null;
+
       if (gameOverDelay >= GAME_OVER_DELAY_MS && hud) {
-        hud.showWinner(winnerNum, !gauntletContinues);
+        hud.showWinner(winnerNum, !gauntletContinues && !fleetContinues);
       }
-      // Gauntlet: auto-advance to next round after showing winner for 5 seconds
+
+      // P1 wins — gauntlet auto-advance to next AI
       if (gauntletContinues && gameOverDelay >= GAME_OVER_DELAY_MS + GAUNTLET_ADVANCE_MS) {
         cleanupRound();
         if (hud) { hud.destroy(); hud = null; }
@@ -973,6 +1000,14 @@ const gameLoop = new GameLoop(
         currentP2Def = nextP2Def;
         remainingAIShips.splice(nextIndex, 1);
         startMelee(currentP1Def!, nextP2Def);
+        return;
+      }
+
+      // P1 dies with ships remaining — return to selection after delay
+      if (fleetContinues && gameOverDelay >= GAME_OVER_DELAY_MS + GAUNTLET_ADVANCE_MS) {
+        cleanupRound();
+        if (hud) { hud.destroy(); hud = null; }
+        showSelectionScreenForFleet();
         return;
       }
     }
