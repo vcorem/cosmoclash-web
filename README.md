@@ -6,6 +6,8 @@ CosmoClash is a WebGL reimplementation of an original C++ game built with the [I
 
 The game was ported in about 48 hours using Claude Code
 
+The game is hosted here: [cosmoclash.vercel.app](https://cosmoclash.vercel.app/)
+
 ## Gameplay
 
 Battle an AI opponent in a bounded arena with wrap-around edges. A central sun exerts gravitational pull on everything — ships, bullets, and debris alike. Manage your energy to fire weapons, dodge projectiles, and outmaneuver your opponent in zero-gravity combat.
