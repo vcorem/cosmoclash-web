@@ -4,6 +4,8 @@ A space battle arena game running in the browser, built with **Three.js** and **
 
 CosmoClash is a WebGL reimplementation of an original C++ game built with the [Irrlicht 3D engine](https://irrlicht.sourceforge.io/) around the year 2008. The port faithfully recreates the gameplay mechanics, physics, and visual style — from sweep-sphere collision detection to the unique snot mechanic — while running entirely in a web browser with zero plugins.
 
+The game was ported in about 48 hours using Claude Code, ~17 years after the original code was last modified. 
+
 ## Gameplay
 
 Battle an AI opponent in a bounded arena with wrap-around edges. A central sun exerts gravitational pull on everything — ships, bullets, and debris alike. Manage your energy to fire weapons, dodge projectiles, and outmaneuver your opponent in zero-gravity combat.
