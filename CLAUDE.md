@@ -116,3 +116,13 @@ npm run dev          # Start dev server
 npx vitest run       # Run all tests (531 tests)
 npx tsc --noEmit     # Type check
 ```
+
+## Signalwake campaign
+
+- `src/app.ts` selects campaign by default, classic melee via `?mode=melee`; load the 3D engine only when a battle begins.
+- Keep authored campaign content in `src/campaign/world.ts` and state transitions pure in `engine.ts`; UI changes must follow engine action availability.
+- Preserve the browser voyage on failed combat startup or unavailable storage. Import saves through the same validator as normal load.
+- Campaign pages can scroll before a battle. The arena must use fixed positioning, and Viewport’s body styles must be restored after combat.
+- Use actual alliance flags for alliance badges and finale gating; reputation alone is not an alliance.
+- Preserve the full 0..100 map coordinate range, including southern systems.
+- Use at most two Vitest workers on a busy machine to avoid Three.js import timeouts.

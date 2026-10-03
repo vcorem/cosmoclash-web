@@ -9,7 +9,7 @@ import { ARENA } from '@/game/Arena';
 import { Bullet, BulletConfig, FLAME_BULLET_CONFIG, PLASMA_BULLET_CONFIG, SUN_BULLET_CONFIG, ICE_BULLET_CONFIG, FROST_SHIELD_CONFIG } from '@/game/Bullet';
 import { Entity, EntityType } from '@/engine/Entity';
 import { EntityPool } from '@/engine/EntityPool';
-import { InputManager, PlayerInput } from '@/input/InputManager';
+import { InputManager, PlayerInput, CAMPAIGN_BINDINGS } from '@/input/InputManager';
 import { ThrustEffect } from '@/game/ThrustEffect';
 import { FrostTrailEffect } from '@/game/FrostTrailEffect';
 import { CollisionDetector } from '@/engine/CollisionDetector';
@@ -36,11 +36,31 @@ import { DifficultyLevel } from '@/ai/AIConstants';
 import { SoundManager } from '@/audio/SoundManager';
 import { SoundEventListener } from '@/audio/SoundEventListener';
 import { SoundEffect } from '@/audio/SoundEffect';
+import { COMBAT_START_EVENT, COMBAT_RESULT_EVENT, COMBAT_CANCEL_EVENT, equipCampaignPlayer, normalizeCombatRequest } from '@/campaign/combat';
+import type { CombatRequest, CombatResult, CombatLoadout } from '@/campaign/combat';
 import '@/ui/hud.css';
+import '@/campaign/combat.css';
+
+// The classic fleet gauntlet remains available explicitly. Campaign launches
+// reuse this renderer and loop, but never enter the gauntlet's menu flow.
+const campaignMode = new URLSearchParams(window.location.search).get('mode') !== 'melee';
 
 // Viewport container — maintains 4:3 aspect ratio with letterboxing
+const originalBodyStyles = {
+  margin: document.body.style.margin,
+  overflow: document.body.style.overflow,
+  background: document.body.style.background,
+};
 const viewport = new Viewport();
 const container = viewport.container;
+if (campaignMode) {
+  // Viewport configures the classic game's page. Keep the campaign's own
+  // scrolling and background until an encounter takes over the screen.
+  Object.assign(document.body.style, originalBodyStyles);
+  container.style.position = 'fixed';
+  container.style.zIndex = '2000';
+  container.style.background = '#02030b';
+}
 
 // Setup Three.js — melee scene (persistent across rounds)
 const scene = createScene();
@@ -52,7 +72,7 @@ let prevStarCamX = 0;
 let prevStarCamY = 0;
 
 // Resize handling
-window.addEventListener('resize', () => {
+function resizeRenderer(): void {
   const w = viewport.width;
   const h = viewport.height;
   camera.aspect = w / h;
@@ -63,7 +83,8 @@ window.addEventListener('resize', () => {
     selectionScene.camera.aspect = w / h;
     selectionScene.camera.updateProjectionMatrix();
   }
-});
+}
+window.addEventListener('resize', resizeRenderer);
 
 // Players — created dynamically based on character selection
 let player1: Player = new MichiGichiPlayer();
@@ -94,6 +115,27 @@ let p1Mixer: THREE.AnimationMixer | null = null;
 let p1AnimAction: THREE.AnimationAction | null = null;
 let p2Mixer: THREE.AnimationMixer | null = null;
 let p2AnimAction: THREE.AnimationAction | null = null;
+let roundGeneration = 0;
+
+function disposePlayerModel(root: THREE.Object3D): void {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+  root.traverse((child) => {
+    if (!(child as THREE.Mesh).isMesh) return;
+    const mesh = child as THREE.Mesh;
+    geometries.add(mesh.geometry);
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      materials.add(material);
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) textures.add(value);
+      }
+    }
+  });
+  geometries.forEach(geometry => geometry.dispose());
+  materials.forEach(material => material.dispose());
+  textures.forEach(texture => texture.dispose());
+}
 
 // Load a player model based on CharacterDef
 function loadPlayerModel(
@@ -101,9 +143,15 @@ function loadPlayerModel(
   onLoaded: (mesh: THREE.Object3D) => void,
   onMorphReady: ((mixer: THREE.AnimationMixer, action: THREE.AnimationAction) => void) | null,
 ): void {
+  const generation = roundGeneration;
   loader.load(
     charDef.modelPath,
     (gltf) => {
+      // A retreat or a new round may finish before a slow model download.
+      if (generation !== roundGeneration) {
+        disposePlayerModel(gltf.scene);
+        return;
+      }
       const container = new THREE.Group();
       const model = gltf.scene.clone();
       model.scale.set(charDef.modelScale, charDef.modelScale, charDef.modelScale);
@@ -134,6 +182,7 @@ function loadPlayerModel(
     },
     undefined,
     () => {
+      if (generation !== roundGeneration) return;
       console.warn(`Could not load ${charDef.modelPath}, using placeholder`);
       const container = new THREE.Group();
       const geo = new THREE.ConeGeometry(8, 20, 8);
@@ -464,7 +513,7 @@ function spawnAsteroids(): void {
 }
 
 loadAsteroidModels(() => {
-  spawnAsteroids();
+  if (gameState === 'playing' && asteroidPool.activeCount === 0) spawnAsteroids();
 });
 
 // Sun point light
@@ -477,7 +526,8 @@ const entityManager = new EntityManager();
 entityManager.add(player1);
 entityManager.add(player2);
 entityManager.add(sun);
-const input = new InputManager();
+const input = new InputManager(campaignMode ? CAMPAIGN_BINDINGS : undefined);
+input.setEnabled(!campaignMode);
 const cameraController = new CameraController();
 
 // HUD overlay — created when entering melee, destroyed on return to selection
@@ -498,8 +548,8 @@ function hasRemainingP1Ships(): boolean {
 }
 
 // Game state — starts with logo splash
-type GameState = 'logo' | 'menu' | 'difficulty' | 'selection' | 'playing' | 'gameOver';
-let gameState: GameState = 'logo';
+type GameState = 'idle' | 'logo' | 'menu' | 'difficulty' | 'selection' | 'playing' | 'gameOver';
+let gameState: GameState = campaignMode ? 'idle' : 'logo';
 let winnerNum: 1 | 2 = 1;
 let gameOverDelay = 0;
 const GAME_OVER_DELAY_MS = 1500;
@@ -562,7 +612,7 @@ function showSelectionScreenForFleet(): void {
 }
 
 // Logo splash → main menu
-new LogoSplash(container, () => showMainMenu());
+if (!campaignMode) new LogoSplash(container, () => showMainMenu());
 
 // Selection screen state
 let selectionScene: SelectionScene | null = null;
@@ -603,6 +653,13 @@ function createPlayerForDef(charDef: CharacterDef): Player {
 }
 
 function startMelee(p1Def: CharacterDef, p2Def: CharacterDef): void {
+  // Also invalidates callbacks from a previous round's asynchronous loads.
+  roundGeneration++;
+  input.clear();
+  p1PrevSecondary = false;
+  p2PrevSecondary = false;
+  sun.position = { ...ARENA.SUN_POSITION };
+  sun.previousPosition = { ...ARENA.SUN_POSITION };
   // Clean up selection
   if (selectionScene) {
     selectionScene.dispose();
@@ -732,12 +789,14 @@ window.addEventListener('keydown', (e) => {
 // Mute toggle: press M to mute/unmute all audio
 window.addEventListener('keydown', (e) => {
   if (e.key === 'm' || e.key === 'M') {
+    if (campaignMode && gameState === 'idle') return;
     SoundManager.getInstance().toggleMute();
   }
 });
 
 // Debug: press 1/2 to instantly kill player 1/2 with explosion
 window.addEventListener('keydown', (e) => {
+  if (campaignMode) return;
   if (gameState !== 'playing') return;
   const target = e.key === '1' ? player1 : e.key === '2' ? player2 : null;
   if (target && target.alive) {
@@ -749,6 +808,7 @@ window.addEventListener('keydown', (e) => {
 
 // Cleanup pools, sprites, and meshes between rounds
 function cleanupRound(): void {
+  roundGeneration++;
   // Clear all pools
   bulletPool.releaseAll();
   snotPool.releaseAll();
@@ -777,16 +837,27 @@ function cleanupRound(): void {
   }
 
   // Remove player meshes from melee scene
-  if (p1Mesh) { scene.remove(p1Mesh); p1Mesh = null; }
-  if (p2Mesh) { scene.remove(p2Mesh); p2Mesh = null; }
+  p1Mixer?.stopAllAction();
+  p2Mixer?.stopAllAction();
+  if (p1Mesh) { scene.remove(p1Mesh); disposePlayerModel(p1Mesh); p1Mesh = null; }
+  if (p2Mesh) { scene.remove(p2Mesh); disposePlayerModel(p2Mesh); p2Mesh = null; }
   p1Mixer = null;
   p1AnimAction = null;
   p2Mixer = null;
   p2AnimAction = null;
+  entityManager.entities = [];
+  aiController = null;
+  input.clear();
+  // Expire old world-space particle trails before the next encounter.
+  thrustEffect1.update(10_000, false, 0, 0, 0);
+  thrustEffect2.update(10_000, false, 0, 0, 0);
+  frostTrail1.update(10_000, false, 0, 0);
+  frostTrail2.update(10_000, false, 0, 0);
 }
 
 // Game over: press any key to return to menu (only when gauntlet isn't auto-advancing)
 window.addEventListener('keydown', () => {
+  if (campaignMode) return;
   if (gameState !== 'gameOver') return;
   if (gameOverDelay < GAME_OVER_DELAY_MS) return;
 
@@ -807,6 +878,150 @@ window.addEventListener('keydown', () => {
 
 let p1PrevSecondary = false;
 let p2PrevSecondary = false;
+
+// ----- Campaign encounter lifecycle -----
+let campaignRequest: CombatRequest | null = null;
+let campaignLoadout: CombatLoadout | null = null;
+let campaignControls: HTMLDivElement | null = null;
+let campaignBackdrop: HTMLDivElement | null = null;
+let pauseNotice: HTMLDivElement | null = null;
+let campaignPaused = false;
+let campaignApp: HTMLElement | null = null;
+let appPreviousVisibility = '';
+let bodyPreviousOverflow = originalBodyStyles.overflow;
+let controlsAbort: AbortController | null = null;
+
+function finishCampaignCombat(escaped = false, cancelled = false): void {
+  if (!campaignRequest) return;
+  const result: CombatResult = {
+    won: !escaped && player1.alive && !player2.alive,
+    hullFraction: Math.max(0, Math.min(1, player1.health / (campaignLoadout?.hullCapacity ?? 1))),
+    escaped,
+  };
+  campaignRequest = null;
+  campaignLoadout = null;
+  campaignPaused = false;
+  controlsAbort?.abort();
+  controlsAbort = null;
+  campaignControls?.remove();
+  campaignControls = null;
+  campaignBackdrop?.remove();
+  campaignBackdrop = null;
+  pauseNotice = null;
+  hud?.destroy();
+  hud = null;
+  cleanupRound();
+  input.setEnabled(false);
+  gameState = 'idle';
+  container.style.display = 'none';
+  document.body.style.overflow = bodyPreviousOverflow;
+  if (campaignApp) campaignApp.style.visibility = appPreviousVisibility;
+  campaignApp = null;
+  SoundManager.getInstance().stopMusic();
+  if (!cancelled) window.dispatchEvent(new CustomEvent(COMBAT_RESULT_EVENT, { detail: result }));
+}
+
+function setCampaignPaused(paused: boolean): void {
+  if (!campaignRequest) return;
+  campaignPaused = paused;
+  input.setEnabled(!paused);
+  if (pauseNotice) pauseNotice.hidden = !paused;
+}
+
+function showCampaignControls(): void {
+  controlsAbort?.abort();
+  controlsAbort = new AbortController();
+  const signal = controlsAbort.signal;
+  campaignControls = document.createElement('div');
+  campaignControls.className = 'signalwake-combat-controls';
+  const hint = document.createElement('div');
+  hint.className = 'signalwake-combat-hint';
+  hint.textContent = 'W / ↑ thrust · A / D turn · Space fire · Shift special · Esc retreat · M mute';
+  campaignControls.appendChild(hint);
+  const retreat = document.createElement('button');
+  retreat.className = 'signalwake-combat-retreat';
+  retreat.textContent = 'Retreat · Esc';
+  retreat.addEventListener('click', () => finishCampaignCombat(true), { signal });
+  campaignControls.appendChild(retreat);
+
+  const touch = document.createElement('div');
+  touch.className = 'signalwake-touch-controls';
+  touch.setAttribute('aria-label', 'Touch flight controls');
+  const actions: Array<[string, keyof PlayerInput]> = [
+    ['↶ Turn', 'rotateLeft'], ['↑ Thrust', 'thrust'], ['Turn ↷', 'rotateRight'],
+    ['Fire', 'firePrimary'], ['Special', 'fireSecondary'],
+  ];
+  for (const [label, action] of actions) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.setAttribute('aria-label', label);
+    button.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      button.setPointerCapture?.(event.pointerId);
+      input.setAction(0, action, true);
+    }, { signal });
+    const release = () => input.setAction(0, action, false);
+    button.addEventListener('pointerup', release, { signal });
+    button.addEventListener('pointercancel', release, { signal });
+    button.addEventListener('lostpointercapture', release, { signal });
+    touch.appendChild(button);
+  }
+  const touchRetreat = document.createElement('button');
+  touchRetreat.textContent = 'Retreat';
+  touchRetreat.addEventListener('click', () => finishCampaignCombat(true), { signal });
+  touch.appendChild(touchRetreat);
+  campaignControls.appendChild(touch);
+
+  pauseNotice = document.createElement('div');
+  pauseNotice.className = 'signalwake-combat-paused';
+  pauseNotice.textContent = 'Combat paused. Return to this window to continue.';
+  pauseNotice.hidden = true;
+  campaignControls.appendChild(pauseNotice);
+  container.appendChild(campaignControls);
+}
+
+window.addEventListener(COMBAT_START_EVENT, (event) => {
+  if (!campaignMode || campaignRequest || gameState !== 'idle') return;
+  const request = normalizeCombatRequest((event as CustomEvent<CombatRequest>).detail);
+  const p1Def = CHARACTER_REGISTRY.find(c => c.id === request.playerShip)!;
+  const p2Def = CHARACTER_REGISTRY.find(c => c.id === request.enemyShip)!;
+  campaignRequest = request;
+  bodyPreviousOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  aiDifficulty = request.difficulty;
+  remainingAIShips = [];
+  currentP1Def = p1Def;
+  currentP2Def = p2Def;
+  campaignApp = document.getElementById('signalwake-app');
+  if (campaignApp) {
+    appPreviousVisibility = campaignApp.style.visibility;
+    campaignApp.style.visibility = 'hidden';
+  }
+  campaignBackdrop = document.createElement('div');
+  Object.assign(campaignBackdrop.style, { position: 'fixed', inset: '0', background: '#02030b', zIndex: '1999' });
+  document.body.appendChild(campaignBackdrop);
+  container.style.display = '';
+  resizeRenderer();
+  input.setEnabled(true);
+  startMelee(p1Def, p2Def);
+  campaignLoadout = equipCampaignPlayer(player1, request);
+  showCampaignControls();
+  setCampaignPaused(document.hidden);
+});
+window.addEventListener(COMBAT_CANCEL_EVENT, () => finishCampaignCombat(false, true));
+window.addEventListener('keydown', (event) => {
+  if (campaignMode && campaignRequest && event.key === 'Escape') {
+    event.preventDefault();
+    finishCampaignCombat(true);
+  }
+});
+window.addEventListener('blur', () => setCampaignPaused(true));
+window.addEventListener('focus', () => setCampaignPaused(document.hidden));
+document.addEventListener('visibilitychange', () => setCampaignPaused(document.hidden || !document.hasFocus()));
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+  event.preventDefault();
+  finishCampaignCombat(true);
+});
 
 // Per-player update helper
 function updatePlayerInput(
@@ -1013,6 +1228,7 @@ function handlePlayerWrapAround(p1: Player, p2: Player): boolean {
 // Game loop
 const gameLoop = new GameLoop(
   (dt: number) => {
+    if (gameState === 'idle' || campaignPaused) return;
     if (gameState === 'logo' || gameState === 'menu' || gameState === 'difficulty') {
       return; // HTML overlays handle these states
     }
@@ -1029,6 +1245,7 @@ const gameLoop = new GameLoop(
     let playerWrapped = false;
 
     if (gameState === 'playing') {
+      campaignLoadout?.refreshStats();
       // Collision detection FIRST (matches original C++ loop order)
       const allEntities = [
         ...entityManager.entities,
@@ -1108,8 +1325,12 @@ const gameLoop = new GameLoop(
       }
     } else if (gameState === 'gameOver') {
       gameOverDelay += dt;
-      const gauntletContinues = winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
-      const fleetContinues = winnerNum === 2 && hasRemainingP1Ships() && currentP2Def !== null;
+      if (campaignMode && gameOverDelay >= GAME_OVER_DELAY_MS) {
+        finishCampaignCombat();
+        return;
+      }
+      const gauntletContinues = !campaignMode && winnerNum === 1 && remainingAIShips.length > 0 && currentP1Def !== null;
+      const fleetContinues = !campaignMode && winnerNum === 2 && hasRemainingP1Ships() && currentP2Def !== null;
 
       if (gameOverDelay >= GAME_OVER_DELAY_MS && hud) {
         hud.showWinner(winnerNum, !gauntletContinues && !fleetContinues);
@@ -1324,10 +1545,11 @@ const gameLoop = new GameLoop(
 
     // HUD update every frame
     if (hud) {
-      hud.update(player1.health, player1.energy, player2.health, player2.energy);
+      hud.update(player1.health / (campaignLoadout?.hullCapacity ?? 1), player1.energy, player2.health, player2.energy);
     }
   },
   () => {
+    if (gameState === 'idle') return;
     // Render: switch scene based on game state
     if (gameState === 'logo' || gameState === 'menu' || gameState === 'difficulty') {
       renderer.clear();
@@ -1339,4 +1561,5 @@ const gameLoop = new GameLoop(
   }
 );
 
+if (campaignMode) container.style.display = 'none';
 gameLoop.start();

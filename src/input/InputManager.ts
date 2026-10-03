@@ -6,7 +6,7 @@ export interface PlayerInput {
   fireSecondary: boolean;
 }
 
-interface PlayerKeyBindings {
+export interface PlayerKeyBindings {
   thrust: string[];
   rotateLeft: string[];
   rotateRight: string[];
@@ -33,8 +33,22 @@ const DEFAULT_BINDINGS: PlayerKeyBindings[] = [
   },
 ];
 
+/** Campaign controls all belong to the human pilot; the opponent is AI. */
+export const CAMPAIGN_BINDINGS: PlayerKeyBindings[] = [
+  {
+    thrust: ['ArrowUp', 'w', 'W'],
+    rotateLeft: ['ArrowLeft', 'a', 'A'],
+    rotateRight: ['ArrowRight', 'd', 'D'],
+    firePrimary: [' ', '/'],
+    fireSecondary: ['Shift', '.'],
+  },
+  { thrust: [], rotateLeft: [], rotateRight: [], firePrimary: [], fireSecondary: [] },
+];
+
 export class InputManager {
   private pressed = new Set<string>();
+  private injected = new Map<number, Partial<PlayerInput>>();
+  private enabled = true;
   private bindings: PlayerKeyBindings[];
   private allGameKeys: Set<string>;
   private onKeyDown: (e: KeyboardEvent) => void;
@@ -52,6 +66,7 @@ export class InputManager {
     }
 
     this.onKeyDown = (e: KeyboardEvent) => {
+      if (!this.enabled) return;
       if (this.allGameKeys.has(e.key)) {
         e.preventDefault();
       }
@@ -74,18 +89,35 @@ export class InputManager {
 
   player(index: number): PlayerInput {
     const b = this.bindings[index];
+    const touch = this.injected.get(index);
     return {
-      thrust: b.thrust.some(k => this.pressed.has(k)),
-      rotateLeft: b.rotateLeft.some(k => this.pressed.has(k)),
-      rotateRight: b.rotateRight.some(k => this.pressed.has(k)),
-      firePrimary: b.firePrimary.some(k => this.pressed.has(k)),
-      fireSecondary: b.fireSecondary.some(k => this.pressed.has(k)),
+      thrust: !!touch?.thrust || b.thrust.some(k => this.pressed.has(k)),
+      rotateLeft: !!touch?.rotateLeft || b.rotateLeft.some(k => this.pressed.has(k)),
+      rotateRight: !!touch?.rotateRight || b.rotateRight.some(k => this.pressed.has(k)),
+      firePrimary: !!touch?.firePrimary || b.firePrimary.some(k => this.pressed.has(k)),
+      fireSecondary: !!touch?.fireSecondary || b.fireSecondary.some(k => this.pressed.has(k)),
     };
+  }
+
+  /** Pointer controls do not synthesize keyboard events or affect the AI. */
+  setAction(index: number, action: keyof PlayerInput, pressed: boolean): void {
+    if (!this.enabled) return;
+    this.injected.set(index, { ...this.injected.get(index), [action]: pressed });
+  }
+
+  clear(): void {
+    this.pressed.clear();
+    this.injected.clear();
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.clear();
   }
 
   destroy(): void {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
-    this.pressed.clear();
+    this.clear();
   }
 }
