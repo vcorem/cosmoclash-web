@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { InputManager } from './InputManager';
+import { InputManager, CAMPAIGN_BINDINGS } from './InputManager';
 
 function press(key: string) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key }));
@@ -154,6 +154,44 @@ describe('InputManager', () => {
       press('ArrowLeft');
       expect(input.player(0).thrust).toBe(false);
       expect(input.player(0).rotateLeft).toBe(false);
+    });
+  });
+
+  describe('campaign pilot and touch controls', () => {
+    beforeEach(() => {
+      input.destroy();
+      input = new InputManager(CAMPAIGN_BINDINGS);
+    });
+
+    it('routes WASD, Space and Shift to Player 1 only', () => {
+      press('w');
+      press('a');
+      press(' ');
+      press('Shift');
+      expect(input.player(0)).toMatchObject({ thrust: true, rotateLeft: true, firePrimary: true, fireSecondary: true });
+      expect(Object.values(input.player(1)).every(value => !value)).toBe(true);
+    });
+
+    it('combines touch with keyboard and releases each source independently', () => {
+      press('ArrowUp');
+      input.setAction(0, 'thrust', true);
+      release('ArrowUp');
+      expect(input.player(0).thrust).toBe(true);
+      input.setAction(0, 'thrust', false);
+      expect(input.player(0).thrust).toBe(false);
+    });
+
+    it('clears held controls on pause and ignores campaign keys while idle', () => {
+      press(' ');
+      input.setAction(0, 'thrust', true);
+      input.setEnabled(false);
+      const event = new KeyboardEvent('keydown', { key: ' ', cancelable: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      input.setAction(0, 'rotateLeft', true);
+      expect(Object.values(input.player(0)).every(value => !value)).toBe(true);
+      input.setEnabled(true);
+      expect(Object.values(input.player(0)).every(value => !value)).toBe(true);
     });
   });
 });

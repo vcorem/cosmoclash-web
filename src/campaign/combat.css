@@ -1,0 +1,93 @@
+.signalwake-combat-hint {
+  position: absolute;
+  top: 66px;
+  left: 12px;
+  right: 12px;
+  z-index: 15;
+  color: #ccdfec;
+  font:
+    12px/1.5 system-ui,
+    sans-serif;
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 1px 4px #000;
+}
+.signalwake-combat-retreat {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 20;
+  border: 1px solid #82929a;
+  border-radius: 7px;
+  background: #0d1922dd;
+  color: #e5eff5;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: 12px system-ui;
+}
+.signalwake-combat-paused {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-content: center;
+  background: #07101acc;
+  color: #fff;
+  text-align: center;
+  font:
+    16px/1.8 system-ui,
+    sans-serif;
+  pointer-events: none;
+}
+.signalwake-combat-paused[hidden] {
+  display: none;
+}
+.signalwake-touch-controls {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  justify-content: space-between;
+  gap: 5px;
+  touch-action: none;
+}
+.signalwake-touch-controls button {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px 3px;
+  border-radius: 8px;
+  border: 1px solid #a8c9dc88;
+  background: #142833dd;
+  color: #e5f5fd;
+  font:
+    12px system-ui,
+    sans-serif;
+  user-select: none;
+  touch-action: none;
+}
+.signalwake-touch-controls button:active {
+  background: #285775;
+}
+@media (hover: none), (pointer: coarse) {
+  .signalwake-touch-controls {
+    display: flex;
+  }
+  .signalwake-combat-retreat {
+    bottom: 76px;
+  }
+  .signalwake-combat-hint {
+    top: 58px;
+    font-size: 10px;
+  }
+}
+@media (max-height: 450px) {
+  .signalwake-touch-controls {
+    bottom: 8px;
+  }
+  .signalwake-touch-controls button {
+    min-height: 40px;
+  }
+}

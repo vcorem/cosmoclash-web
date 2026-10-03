@@ -1,4 +1,10 @@
-# CosmoClash Web
+# Signalwake / CosmoClash Web
+
+**Signalwake** is an original single-player space expedition built on the CosmoClash arena. Start at `/`; the original fleet melee remains available at `/?mode=melee`.
+
+Explore 24 authored systems, negotiate with five civilizations, uncover the failing relay network’s secret, upgrade your ship, and choose between three possible futures. Your ship carries its damage and upgrades into real-time battles. Progress saves locally; Ship Log can export/import a voyage. No account, server, or AI API key is needed.
+
+Read the [campaign guide and design notes](docs/signalwake.md) for controls, architecture, research references, and current scope.
 
 ![CosmoClash](public/textures/main-bk.jpg)
 
@@ -15,6 +21,7 @@ The game is hosted here: [cosmoclash.vercel.app](https://cosmoclash.vercel.app/)
 Battle an AI opponent in a bounded arena with wrap-around edges. A central sun exerts gravitational pull on everything — ships, bullets, and debris alike. Manage your energy to fire weapons, dodge projectiles, and outmaneuver your opponent in zero-gravity combat.
 
 **Features:**
+
 - 3 playable ships with unique weapons and abilities
 - AI opponent with 3 difficulty levels (ported from the original Lua scripts)
 - Dynamic zoom camera that tracks the action
@@ -26,21 +33,21 @@ Battle an AI opponent in a bounded arena with wrap-around edges. A central sun e
 
 ### Characters
 
-| Ship | Primary Weapon | Special Ability |
-|------|---------------|-----------------|
-| **MichiGichi** | Plasma Blast (tracking) | Morph between slow+strong and fast+weak forms |
-| **Gondi** | Galactic Flame (persistent beam) | Space Slime launcher |
-| **Sholev** | Ice Cones (radial shards) | Frost Shield — damage aura with speed boost |
+| Ship           | Primary Weapon                   | Special Ability                               |
+| -------------- | -------------------------------- | --------------------------------------------- |
+| **MichiGichi** | Plasma Blast (tracking)          | Morph between slow+strong and fast+weak forms |
+| **Gondi**      | Galactic Flame (persistent beam) | Space Slime launcher                          |
+| **Sholev**     | Ice Cones (radial shards)        | Frost Shield — damage aura with speed boost   |
 
 ### Controls
 
-| Action | Key |
-|--------|-----|
-| Thrust | Arrow Up |
-| Rotate | Arrow Left / Right |
-| Fire | `/` |
-| Secondary | `.` |
-| Mute | M |
+| Action    | Key                |
+| --------- | ------------------ |
+| Thrust    | Arrow Up           |
+| Rotate    | Arrow Left / Right |
+| Fire      | `/`                |
+| Secondary | `.`                |
+| Mute      | M                  |
 
 ## Getting Started
 
@@ -56,20 +63,20 @@ Open `http://localhost:5173` in your browser.
 ```bash
 npm run dev          # Start dev server
 npm run build        # Production build
-npm test             # Run all tests (531+)
+npm test -- --maxWorkers=2 # Run all tests
 npx tsc --noEmit     # Type check
 ```
 
 ## Tech Stack
 
-| | |
-|-|-|
+|               |                                          |
+| ------------- | ---------------------------------------- |
 | **Rendering** | [Three.js](https://threejs.org/) (WebGL) |
-| **Language** | TypeScript |
-| **Build** | [Vite](https://vitejs.dev/) |
-| **Tests** | [Vitest](https://vitest.dev/) |
-| **Audio** | Web Audio API |
-| **3D Models** | glTF/GLB |
+| **Language**  | TypeScript                               |
+| **Build**     | [Vite](https://vitejs.dev/)              |
+| **Tests**     | [Vitest](https://vitest.dev/)            |
+| **Audio**     | Web Audio API                            |
+| **3D Models** | glTF/GLB                                 |
 
 No runtime dependencies beyond Three.js. No UI framework — HUD and menus are hand-written HTML/CSS overlays.
 
